@@ -108,7 +108,10 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
     <div class="lt">FORTIX<span style="color:var(--blue)">.</span></div>
     <div class="ls">Portal do Colaborador</div>
     <div class="fi"><label>NIF</label><input type="text" id="lNif" placeholder="123456789" maxlength="9"/></div>
-    <div class="fi"><label>Senha</label><input type="password" id="lPwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    <div class="fi"><label>Senha</label><div style="position:relative">
+  <input type="password" id="lPwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:40px"/>
+  <button type="button" onclick="const i=document.getElementById('lPwd');i.type=i.type==='password'?'text':'password';this.innerHTML=i.type==='password'?'<i class=&quot;ti ti-eye&quot;></i>':`<i class=&quot;ti ti-eye-off&quot;></i>`" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text2);font-size:16px"><i class="ti ti-eye"></i></button>
+</div></div>
     <button class="bp" onclick="doLogin()">Entrar</button>
     <div class="em" id="lErr">NIF ou senha incorretos.</div>
   </div>
@@ -664,7 +667,12 @@ async function loadAPontos(){
   const el=document.getElementById('aPontosLista');
   if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos</p>';return;}
   el.innerHTML='<table><thead><tr><th>Colaborador</th><th>Data</th><th>Entrada</th><th>Início pausa</th><th>Fim pausa</th><th>Saída</th><th>Total</th><th>Ação</th></tr></thead><tbody>'+
-    data.map(r=>'<tr><td>'+(r.colaboradores?.nome||'—')+'</td><td>'+r.data+'</td><td>'+(r.entrada||'—')+'</td><td>'+(r.inicio_pausa||'—')+'</td><td>'+(r.fim_pausa||'—')+'</td><td>'+(r.saida||'—')+'</td><td>'+(r.total_horas?'<span class="badge bg2">'+r.total_horas+'</span>':'—')+'</td><td style="white-space:nowrap"><button class="bs bb" style="font-size:11px;padding:3px 8px;margin-right:3px" onclick="editarPonto(''+r.id+'',''+(r.colaboradores?.nome||'')+'',''+r.data+'',''+(r.entrada||'')+'',''+(r.inicio_pausa||'')+'',''+(r.fim_pausa||'')+'',''+(r.saida||'')+'')">Editar</button><button class="bs" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:#F09595" onclick="eliminarPonto(''+r.id+'')">Eliminar</button></td></tr>').join('')+'</tbody></table>';
+    data.map(r=>{
+      const nome=r.colaboradores?.nome||'';
+      const btnE='<button class="bs bb" style="font-size:11px;padding:3px 8px;margin-right:3px" onclick="editarPonto(\"'+r.id+'\",\"'+nome+'\",\"'+r.data+'\",\"'+(r.entrada||'')+'\",\"'+(r.inicio_pausa||'')+'\",\"'+(r.fim_pausa||'')+'\",\"'+(r.saida||'')+'\")">' + 'Editar</button>';
+      const btnD='<button class="bs" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:#F09595" onclick="eliminarPonto(\"'+r.id+'\")">'+'Eliminar</button>';
+      return '<tr><td>'+(nome||'—')+'</td><td>'+r.data+'</td><td>'+(r.entrada||'—')+'</td><td>'+(r.inicio_pausa||'—')+'</td><td>'+(r.fim_pausa||'—')+'</td><td>'+(r.saida||'—')+'</td><td>'+(r.total_horas?'<span class="badge bg2">'+r.total_horas+'</span>':'—')+'</td><td style="white-space:nowrap">'+btnE+btnD+'</td></tr>';
+    }).join('')+'</tbody></table>';
 }
 
 async function loadARForm(){
