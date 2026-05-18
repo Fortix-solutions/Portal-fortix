@@ -131,10 +131,10 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
       <div class="pt" id="dashTitle">Bem-vindo! 👋</div>
       <div class="ps">Portal Fortix Solutions</div>
       <div class="sg">
-        <div class="sc"><div class="si">🕐</div><div class="sl">Registos ponto</div><div class="sv" id="stPonto">—</div></div>
-        <div class="sc"><div class="si">📄</div><div class="sl">Recibos</div><div class="sv" id="stRecibos">—</div></div>
-        <div class="sc"><div class="si">📁</div><div class="sl">Documentos</div><div class="sv" id="stDocs">—</div></div>
-        <div class="sc"><div class="si">✅</div><div class="sl">Estado</div><div class="sv"><span class="badge bg2">Ativo</span></div></div>
+        <div class="sc"><div class="si">🕐</div><div class="sl" id="stLabel1">Registos ponto</div><div class="sv" id="stPonto">—</div></div>
+        <div class="sc"><div class="si">📄</div><div class="sl" id="stLabel2">Recibos</div><div class="sv" id="stRecibos">—</div></div>
+        <div class="sc"><div class="si">📁</div><div class="sl" id="stLabel3">Documentos</div><div class="sv" id="stDocs">—</div></div>
+        <div class="sc"><div class="si" id="stIcon4">✅</div><div class="sl" id="stLabel4">Estado</div><div class="sv" id="stVal4"><span class="badge bg2">Ativo</span></div></div>
       </div>
       <div class="cd">
         <div class="ch"><div class="ct">Últimos registos de ponto</div><button class="bs bb" onclick="showP('ponto')">Ver todos</button></div>
@@ -145,6 +145,10 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
     <div id="p-ponto" class="hidden">
       <div class="pt">Folha de ponto</div>
       <div class="ps">Registe entradas, pausas e saídas</div>
+      <div class="sg" style="margin-bottom:1rem">
+        <div class="sc"><div class="si">📅</div><div class="sl">Dias trabalhados este mês</div><div class="sv" id="diasMes">—</div></div>
+        <div class="sc"><div class="si">⏱️</div><div class="sl">Total horas este mês</div><div class="sv" id="horasMes">—</div></div>
+      </div>
       <div class="cd">
         <div class="clk" id="clkDisp">--:--:--</div>
         <div class="cdt" id="clkDate">—</div>
@@ -291,6 +295,27 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
   </div>
 </div>
 
+<div class="mo" id="modalEditColab">
+  <div class="mb" style="max-width:500px">
+    <button class="mc" onclick="closeModal('modalEditColab')">&#x2715;</button>
+    <div style="font-size:17px;font-weight:600;margin-bottom:1rem"><i class="ti ti-edit"></i> Editar Colaborador</div>
+    <input type="hidden" id="editId"/>
+    <div class="fg">
+      <div class="fi" style="grid-column:1/-1"><label>Nome completo</label><input type="text" id="editNome"/></div>
+      <div class="fi"><label>Email</label><input type="email" id="editEmail"/></div>
+      <div class="fi"><label>Cargo</label><input type="text" id="editCargo"/></div>
+      <div class="fi"><label>Departamento</label><input type="text" id="editDepto"/></div>
+      <div class="fi"><label>Data admissão</label><input type="date" id="editAdmissao"/></div>
+      <div class="fi"><label>Nova senha (deixe vazio para não alterar)</label><input type="text" id="editSenha" placeholder="Nova senha provisória"/></div>
+    </div>
+    <div id="editMsg" style="font-size:13px;color:var(--red);min-height:18px;margin-top:8px"></div>
+    <div class="mbt">
+      <button class="bs" onclick="closeModal('modalEditColab')">Cancelar</button>
+      <button class="bs bb" onclick="guardarEditColab()">Guardar alterações</button>
+    </div>
+  </div>
+</div>
+
 <div class="mo" id="modalVerColab">
   <div class="mb" style="max-width:500px">
     <button class="mc" onclick="closeModal('modalVerColab')">&#x2715;</button>
@@ -408,12 +433,34 @@ function showP(page){
 
 async function loadDashboard(){
   if(!cu)return;
-  const{count:rc}=await sb.from('recibos').select('*',{count:'exact',head:true}).eq('colaborador_id',cu.id);
-  const{count:dc}=await sb.from('documentos').select('*',{count:'exact',head:true});
-  const{data:pts}=await sb.from('ponto').select('*').eq('colaborador_id',cu.id).order('data',{ascending:false}).limit(5);
-  document.getElementById('stRecibos').textContent=rc||0;
-  document.getElementById('stDocs').textContent=dc||0;
-  if(pts&&pts.length){document.getElementById('stPonto').textContent=pts.length;document.getElementById('dashPonto').innerHTML=renderPontoTable(pts);}
+  if(cu.is_admin){
+    const{count:tc}=await sb.from('colaboradores').select('*',{count:'exact',head:true}).eq('ativo',true);
+    const{count:rp}=await sb.from('recibos').select('*',{count:'exact',head:true}).eq('assinado',false);
+    const{count:dc}=await sb.from('documentos').select('*',{count:'exact',head:true});
+    const hoje=new Date().toISOString().split('T')[0];
+    const{count:pp}=await sb.from('ponto').select('*',{count:'exact',head:true}).eq('data',hoje);
+    document.getElementById('stPonto').textContent=tc||0;
+    document.getElementById('stRecibos').textContent=rp||0;
+    document.getElementById('stDocs').textContent=dc||0;
+    document.getElementById('stLabel1').textContent='Colaboradores ativos';
+    document.getElementById('stLabel2').textContent='Recibos por assinar';
+    document.getElementById('stLabel3').textContent='Documentos publicados';
+    document.getElementById('stIcon4').textContent='📋';
+    document.getElementById('stLabel4').textContent='Registos hoje';
+    document.getElementById('stVal4').textContent=pp||0;
+    const{data:pts}=await sb.from('ponto').select('*,colaboradores(nome)').order('data',{ascending:false}).limit(5);
+    if(pts&&pts.length){
+      document.getElementById('dashPonto').innerHTML='<table><thead><tr><th>Colaborador</th><th>Data</th><th>Entrada</th><th>Saída</th><th>Total</th></tr></thead><tbody>'+
+        pts.map(r=>'<tr><td>'+(r.colaboradores?.nome||'—')+'</td><td>'+r.data+'</td><td>'+(r.entrada||'—')+'</td><td>'+(r.saida||'—')+'</td><td>'+(r.total_horas?'<span class="badge bg2">'+r.total_horas+'</span>':'—')+'</td></tr>').join('')+'</tbody></table>';
+    }
+  } else {
+    const{count:rc}=await sb.from('recibos').select('*',{count:'exact',head:true}).eq('colaborador_id',cu.id);
+    const{count:dc}=await sb.from('documentos').select('*',{count:'exact',head:true});
+    const{data:pts}=await sb.from('ponto').select('*').eq('colaborador_id',cu.id).order('data',{ascending:false}).limit(5);
+    document.getElementById('stRecibos').textContent=rc||0;
+    document.getElementById('stDocs').textContent=dc||0;
+    if(pts&&pts.length){document.getElementById('stPonto').textContent=pts.length;document.getElementById('dashPonto').innerHTML=renderPontoTable(pts);}
+  }
 }
 
 function timeToMin(t){if(!t)return 0;const p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
@@ -441,6 +488,21 @@ async function regP(tipo){
 async function loadPonto(){
   const{data}=await sb.from('ponto').select('*').eq('colaborador_id',cu.id).order('data',{ascending:false}).limit(20);
   document.getElementById('pontoHist').innerHTML=data&&data.length?renderPontoTable(data):'<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos</p>';
+  const mes=new Date().getMonth()+1;
+  const ano=new Date().getFullYear();
+  const mesPad=String(mes).padStart(2,'0');
+  const mesData=data?data.filter(r=>r.data&&r.data.startsWith(ano+'-'+mesPad)):[];
+  document.getElementById('diasMes').textContent=mesData.length;
+  let totalMin=0;
+  mesData.forEach(r=>{
+    if(r.total_horas){
+      const p=r.total_horas.split('h');
+      totalMin+=parseInt(p[0]||0)*60+parseInt(p[1]||0);
+    }
+  });
+  const th=Math.floor(totalMin/60);
+  const tm=totalMin%60;
+  document.getElementById('horasMes').textContent=totalMin>0?th+'h'+String(tm).padStart(2,'0'):'—';
 }
 
 function renderPontoTable(rows){
@@ -524,9 +586,10 @@ async function loadAColab(){
     data.map(c=>{
       const btnDesativar='<button class="bs" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:#F09595" onclick="toggleAtivo(\'' +c.id+ '\',false)">Desativar</button>';
       const btnReativar='<button class="bs" style="font-size:11px;padding:4px 10px;color:var(--green);border-color:#9fd3a8" onclick="toggleAtivo(\'' +c.id+ '\',true)">Reativar</button>';
+      const btnEditar='<button class="bs" style="font-size:11px;padding:4px 10px;margin-right:4px;background:var(--amber);color:#fff;border-color:var(--amber)" onclick="editarColab(\'' +c.id+ '\')">Editar</button>';
       const btnVer='<button class="bs bb" style="font-size:11px;padding:4px 10px;margin-right:4px" onclick="verColab(\'' +c.id+ '\')">Ver dados</button>';
       const btnExcluir='<button class="bs" style="font-size:11px;padding:4px 10px;color:#fff;background:#C0392B;border-color:#C0392B;margin-left:4px" onclick="excluirColab(\'' +c.id+ '\',\'' +c.nome+ '\')">Excluir</button>';
-      const acao=btnVer+(c.nif!=='000000000'?(c.ativo?btnDesativar:btnReativar)+btnExcluir:'');
+      const acao=btnEditar+btnVer+(c.nif!=='000000000'?(c.ativo?btnDesativar:btnReativar)+btnExcluir:'');
       return '<tr><td><strong>'+c.nome+'</strong></td><td>'+c.nif+'</td><td>'+(c.cargo||'—')+'</td><td>'+(c.troca_senha?'<span class="badge br2">Pendente</span>':'<span class="badge bg2">✓ Trocada</span>')+'</td><td>'+(c.is_admin?'<span class="badge ba2">Sim</span>':'Não')+'</td><td>'+(c.ativo?'<span class="badge bg2">Ativo</span>':'<span class="badge br2">Inativo</span>')+'</td><td>'+acao+'</td></tr>';
     }).join('')+'</tbody></table>';
 }
@@ -578,7 +641,17 @@ async function carregarRecibo(){
   if(!url){msg.style.color='var(--red)';msg.textContent='Introduza o link do recibo.';return;}
   const{error}=await sb.from('recibos').insert({colaborador_id:cid,mes,ano,ficheiro_url:url});
   if(error){msg.style.color='var(--red)';msg.textContent='Erro: '+error.message;return;}
-  msg.style.color='var(--green)';msg.textContent='Recibo carregado com sucesso!';
+  const{data:colab}=await sb.from('colaboradores').select('nome,email').eq('id',cid).single();
+  if(colab&&colab.email){
+    emailjs.send(EJ_SERVICE,'template_9cnwr2b',{
+      nome:colab.nome,
+      email_destino:colab.email,
+      assunto:'Novo recibo disponível — '+mes+' '+ano,
+      mensagem:'O seu recibo de '+mes+' de '+ano+' já está disponível no portal. Aceda e assine digitalmente.',
+      nif:'—',senha:'—'
+    }).catch(e=>console.log('Email erro:',e));
+  }
+  msg.style.color='var(--green)';msg.textContent='✅ Recibo carregado'+(colab?.email?' e email enviado!':'!');
   document.getElementById('aRUrl').value='';setTimeout(()=>{msg.textContent='';},3000);
 }
 
@@ -608,6 +681,36 @@ async function verColab(id){
   document.getElementById('vAdmin').textContent=data.is_admin?'Sim':'Não';
   document.getElementById('vSenha').textContent=data.troca_senha?'Pendente (não trocou ainda)':'Trocada';
   showModal('modalVerColab');
+}
+
+async function editarColab(id){
+  const{data}=await sb.from('colaboradores').select('*').eq('id',id).single();
+  if(!data)return;
+  document.getElementById('editId').value=id;
+  document.getElementById('editNome').value=data.nome||'';
+  document.getElementById('editEmail').value=data.email||'';
+  document.getElementById('editCargo').value=data.cargo||'';
+  document.getElementById('editDepto').value=data.departamento||'';
+  document.getElementById('editAdmissao').value=data.data_admissao||'';
+  document.getElementById('editSenha').value='';
+  showModal('modalEditColab');
+}
+
+async function guardarEditColab(){
+  const id=document.getElementById('editId').value;
+  const nome=document.getElementById('editNome').value.trim();
+  const email=document.getElementById('editEmail').value.trim();
+  const cargo=document.getElementById('editCargo').value.trim();
+  const depto=document.getElementById('editDepto').value.trim();
+  const admissao=document.getElementById('editAdmissao').value;
+  const senha=document.getElementById('editSenha').value;
+  const msg=document.getElementById('editMsg');
+  if(!nome){msg.textContent='O nome é obrigatório.';return;}
+  const upd={nome,email,cargo,departamento:depto,data_admissao:admissao||null};
+  if(senha){upd.senha=senha;upd.troca_senha=true;}
+  const{error}=await sb.from('colaboradores').update(upd).eq('id',id);
+  if(error){msg.textContent='Erro: '+error.message;return;}
+  closeModal('modalEditColab');loadAColab();
 }
 
 async function excluirColab(id, nome){
