@@ -6,6 +6,7 @@
 <title>Portal Fortix Solutions</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.4.0/dist/tabler-icons.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#f0f0ee;--card:#fff;--border:#e2e0d8;--text:#1a1a18;--text2:#5a5a58;--blue:#185FA5;--blu:#E6F1FB;--amber:#BA7517;--green:#2D7D3A;--grenl:#E6F4EA;--red:#C0392B;--redl:#FCEBEB;--ambl:#FAEEDA;--r:12px}
@@ -120,6 +121,7 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
       <div class="ni" id="n-apontos" onclick="showP('apontos')"><i class="ti ti-report"></i> Relatório pontos</div>
       <div class="ni" id="n-arecibos" onclick="showP('arecibos')"><i class="ti ti-upload"></i> Carregar recibos</div>
       <div class="ni" id="n-adocs" onclick="showP('adocs')"><i class="ti ti-file-plus"></i> Publicar documentos</div>
+      <div class="ni" id="n-assinaturas" onclick="showP('assinaturas')"><i class="ti ti-signature"></i> Assinaturas</div>
     </div>
     <div class="nl" onclick="doLogout()"><i class="ti ti-logout"></i> Sair</div>
   </div>
@@ -259,6 +261,12 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
         <div id="aDMsg" style="margin-top:8px;font-size:13px"></div>
       </div>
     </div>
+
+    <div id="p-assinaturas" class="hidden">
+      <div class="pt">Assinaturas de recibos</div>
+      <div class="ps">Consulte quem assinou e veja a assinatura</div>
+      <div class="cd"><div id="assLista"><p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem assinaturas</p></div></div>
+    </div>
   </div>
 </div>
 
@@ -298,6 +306,10 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
 const SB_URL='https://wbriqlcqfgnpjbxesmdc.supabase.co';
 const SB_KEY='sb_publishable_T2GYe2-5dVrXLWZasUzPZQ_DnS7k-27';
 const sb=supabase.createClient(SB_URL,SB_KEY);
+const EJ_SERVICE='fortix-portal';
+const EJ_TEMPLATE='template_9cnwr2b';
+const EJ_KEY='VVnUaYw4nWoK2VpdJ';
+emailjs.init(EJ_KEY);
 let cu=null,clkInt=null,sigCtx,sigCvs,drawing=false,curRec=null;
 
 async function doLogin(){
@@ -353,7 +365,7 @@ function startClock(){
 }
 
 function showP(page){
-  ['dash','ponto','recibos','docs','ficha','acolab','apontos','arecibos','adocs'].forEach(p=>{
+  ['dash','ponto','recibos','docs','ficha','acolab','apontos','arecibos','adocs','assinaturas'].forEach(p=>{
     const el=document.getElementById('p-'+p);if(el)el.classList.add('hidden');
     const n=document.getElementById('n-'+p);if(n)n.classList.remove('active');
   });
@@ -367,6 +379,7 @@ function showP(page){
   if(page==='apontos')loadAPontos();
   if(page==='arecibos')loadARForm();
   if(page==='dash')loadDashboard();
+  if(page==='assinaturas')loadAssinaturas();
 }
 
 async function loadDashboard(){
@@ -499,8 +512,16 @@ async function criarColab(){
   if(!nome||!nif||!senha){msg.textContent='Nome, NIF e senha são obrigatórios.';return;}
   const{error}=await sb.from('colaboradores').insert({nome,nif,email,senha,cargo,departamento:depto,is_admin:isAdm});
   if(error){msg.textContent='Erro: '+(error.message||'NIF já existe');return;}
+  if(email){
+    emailjs.send(EJ_SERVICE,EJ_TEMPLATE,{nome,nif,senha,email_destino:email})
+      .then(()=>console.log('Email enviado'))
+      .catch(e=>console.log('Erro email:',e));
+  }
   closeModal('modalColab');['nNome','nNif','nEmail','nSenha','nCargo','nDepto'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('nIsAdm').checked=false;loadAColab();
+  document.getElementById('nIsAdm').checked=false;
+  msg.style.color='var(--green)';msg.textContent=email?'✅ Colaborador criado e email enviado!':'✅ Colaborador criado!';
+  setTimeout(()=>{msg.textContent='';},4000);
+  loadAColab();
 }
 
 async function loadAPontos(){
@@ -541,6 +562,15 @@ async function publicarDoc(){
   msg.style.color='var(--green)';msg.textContent='Documento publicado!';
   ['aDTit','aDDesc','aDUrl'].forEach(id=>document.getElementById(id).value='');
   setTimeout(()=>{msg.textContent='';loadDocs();},3000);
+}
+
+async function loadAssinaturas(){
+  const{data}=await sb.from('assinaturas_recibos').select('*,colaboradores(nome),recibos(mes,ano)').order('data_assinatura',{ascending:false});
+  const el=document.getElementById('assLista');
+  if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem assinaturas</p>';return;}
+  el.innerHTML='<table><thead><tr><th>Colaborador</th><th>Recibo</th><th>Data assinatura</th><th>Assinatura</th></tr></thead><tbody>'+
+    data.map(a=>'<tr><td>'+(a.colaboradores?.nome||'—')+'</td><td>'+(a.recibos?.mes||'—')+' '+(a.recibos?.ano||'')+'</td><td>'+new Date(a.data_assinatura).toLocaleDateString('pt-PT')+' '+new Date(a.data_assinatura).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})+'</td><td>'+(a.assinatura_img?'<img src="'+a.assinatura_img+'" style="height:40px;border:1px solid var(--border);border-radius:4px;background:#fff" />':'—')+'</td></tr>').join('')+
+    '</tbody></table>';
 }
 
 function showModal(id){document.getElementById(id).style.display='flex';}
