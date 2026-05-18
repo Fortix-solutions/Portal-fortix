@@ -666,13 +666,25 @@ async function loadAPontos(){
   const{data}=await sb.from('ponto').select('*,colaboradores(nome)').order('data',{ascending:false}).limit(50);
   const el=document.getElementById('aPontosLista');
   if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos</p>';return;}
-  el.innerHTML='<table><thead><tr><th>Colaborador</th><th>Data</th><th>Entrada</th><th>Início pausa</th><th>Fim pausa</th><th>Saída</th><th>Total</th><th>Ação</th></tr></thead><tbody>'+
-    data.map(r=>{
-      const nome=r.colaboradores?.nome||'';
-      const btnE='<button class="bs bb" style="font-size:11px;padding:3px 8px;margin-right:3px" onclick="editarPonto(\"'+r.id+'\",\"'+nome+'\",\"'+r.data+'\",\"'+(r.entrada||'')+'\",\"'+(r.inicio_pausa||'')+'\",\"'+(r.fim_pausa||'')+'\",\"'+(r.saida||'')+'\")">' + 'Editar</button>';
-      const btnD='<button class="bs" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:#F09595" onclick="eliminarPonto(\"'+r.id+'\")">'+'Eliminar</button>';
-      return '<tr><td>'+(nome||'—')+'</td><td>'+r.data+'</td><td>'+(r.entrada||'—')+'</td><td>'+(r.inicio_pausa||'—')+'</td><td>'+(r.fim_pausa||'—')+'</td><td>'+(r.saida||'—')+'</td><td>'+(r.total_horas?'<span class="badge bg2">'+r.total_horas+'</span>':'—')+'</td><td style="white-space:nowrap">'+btnE+btnD+'</td></tr>';
-    }).join('')+'</tbody></table>';
+  pontosData=data;
+  let rows='';
+  data.forEach(function(r,i){
+    const nome=r.colaboradores?r.colaboradores.nome:'—';
+    const total=r.total_horas?'<span class="badge bg2">'+r.total_horas+'</span>':'—';
+    rows+='<tr>';
+    rows+='<td>'+nome+'</td>';
+    rows+='<td>'+(r.data||'—')+'</td>';
+    rows+='<td>'+(r.entrada||'—')+'</td>';
+    rows+='<td>'+(r.inicio_pausa||'—')+'</td>';
+    rows+='<td>'+(r.fim_pausa||'—')+'</td>';
+    rows+='<td>'+(r.saida||'—')+'</td>';
+    rows+='<td>'+total+'</td>';
+    rows+='<td style="white-space:nowrap">';
+    rows+='<button class="bs bb" style="font-size:11px;padding:3px 8px;margin-right:3px" onclick="editarPontoIdx('+i+')">Editar</button>';
+    rows+='<button class="bs" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:#F09595" onclick="eliminarPontoIdx('+i+')">Eliminar</button>';
+    rows+='</td></tr>';
+  });
+  el.innerHTML='<table><thead><tr><th>Colaborador</th><th>Data</th><th>Entrada</th><th>Início pausa</th><th>Fim pausa</th><th>Saída</th><th>Total</th><th>Ação</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 
 async function loadARForm(){
@@ -812,6 +824,12 @@ async function guardarEditPonto(){
   const{error}=await sb.from('ponto').update({data,entrada:entrada||null,inicio_pausa:inicio_pausa||null,fim_pausa:fim_pausa||null,saida:saida||null,total_horas}).eq('id',id);
   if(error){msg.textContent='Erro: '+error.message;return;}
   closeModal('modalEditPonto');loadAPontos();
+}
+
+function eliminarPontoIdx(i){
+  const r=pontosData[i];
+  if(!r)return;
+  eliminarPonto(r.id);
 }
 
 async function eliminarPonto(id){
