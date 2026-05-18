@@ -291,6 +291,30 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
   </div>
 </div>
 
+<div class="mo" id="modalVerColab">
+  <div class="mb" style="max-width:500px">
+    <button class="mc" onclick="closeModal('modalVerColab')">&#x2715;</button>
+    <div style="font-size:17px;font-weight:600;margin-bottom:1rem"><i class="ti ti-user"></i> Dados do Colaborador</div>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1rem">
+      <div class="fsec"><i class="ti ti-id-badge-2"></i> Identificação</div>
+      <div class="fr"><span class="fl">Nome</span><span id="vNome">—</span></div>
+      <div class="fr"><span class="fl">NIF</span><span id="vNif">—</span></div>
+      <div class="fr"><span class="fl">Email</span><span id="vEmail">—</span></div>
+      <div class="fsec" style="margin-top:8px"><i class="ti ti-briefcase"></i> Dados profissionais</div>
+      <div class="fr"><span class="fl">Cargo</span><span id="vCargo">—</span></div>
+      <div class="fr"><span class="fl">Departamento</span><span id="vDepto">—</span></div>
+      <div class="fr"><span class="fl">Data admissão</span><span id="vAdmissao">—</span></div>
+      <div class="fsec" style="margin-top:8px"><i class="ti ti-settings"></i> Estado no portal</div>
+      <div class="fr"><span class="fl">Estado</span><span id="vEstado">—</span></div>
+      <div class="fr"><span class="fl">Administrador</span><span id="vAdmin">—</span></div>
+      <div class="fr"><span class="fl">Senha</span><span id="vSenha">—</span></div>
+    </div>
+    <div class="mbt">
+      <button class="bs bb" onclick="closeModal('modalVerColab')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <div class="mo" id="modalSenha">
   <div class="mb">
     <div style="font-size:17px;font-weight:600;margin-bottom:8px"><i class="ti ti-lock"></i> Troca de senha obrigatória</div>
@@ -306,7 +330,7 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
 const SB_URL='https://wbriqlcqfgnpjbxesmdc.supabase.co';
 const SB_KEY='sb_publishable_T2GYe2-5dVrXLWZasUzPZQ_DnS7k-27';
 const sb=supabase.createClient(SB_URL,SB_KEY);
-const EJ_SERVICE='fortix-portal';
+const EJ_SERVICE='Fortix-portal';
 const EJ_TEMPLATE='template_9cnwr2b';
 const EJ_KEY='VVnUaYw4nWoK2VpdJ';
 emailjs.init(EJ_KEY);
@@ -500,7 +524,9 @@ async function loadAColab(){
     data.map(c=>{
       const btnDesativar='<button class="bs" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:#F09595" onclick="toggleAtivo(\'' +c.id+ '\',false)">Desativar</button>';
       const btnReativar='<button class="bs" style="font-size:11px;padding:4px 10px;color:var(--green);border-color:#9fd3a8" onclick="toggleAtivo(\'' +c.id+ '\',true)">Reativar</button>';
-      const acao=c.nif!=='000000000'?(c.ativo?btnDesativar:btnReativar):'—';
+      const btnVer='<button class="bs bb" style="font-size:11px;padding:4px 10px;margin-right:4px" onclick="verColab(\'' +c.id+ '\')">Ver dados</button>';
+      const btnExcluir='<button class="bs" style="font-size:11px;padding:4px 10px;color:#fff;background:#C0392B;border-color:#C0392B;margin-left:4px" onclick="excluirColab(\'' +c.id+ '\',\'' +c.nome+ '\')">Excluir</button>';
+      const acao=btnVer+(c.nif!=='000000000'?(c.ativo?btnDesativar:btnReativar)+btnExcluir:'');
       return '<tr><td><strong>'+c.nome+'</strong></td><td>'+c.nif+'</td><td>'+(c.cargo||'—')+'</td><td>'+(c.troca_senha?'<span class="badge br2">Pendente</span>':'<span class="badge bg2">✓ Trocada</span>')+'</td><td>'+(c.is_admin?'<span class="badge ba2">Sim</span>':'Não')+'</td><td>'+(c.ativo?'<span class="badge bg2">Ativo</span>':'<span class="badge br2">Inativo</span>')+'</td><td>'+acao+'</td></tr>';
     }).join('')+'</tbody></table>';
 }
@@ -567,6 +593,30 @@ async function publicarDoc(){
   msg.style.color='var(--green)';msg.textContent='Documento publicado!';
   ['aDTit','aDDesc','aDUrl'].forEach(id=>document.getElementById(id).value='');
   setTimeout(()=>{msg.textContent='';loadDocs();},3000);
+}
+
+async function verColab(id){
+  const{data}=await sb.from('colaboradores').select('*').eq('id',id).single();
+  if(!data)return;
+  document.getElementById('vNome').textContent=data.nome||'—';
+  document.getElementById('vNif').textContent=data.nif||'—';
+  document.getElementById('vEmail').textContent=data.email||'—';
+  document.getElementById('vCargo').textContent=data.cargo||'—';
+  document.getElementById('vDepto').textContent=data.departamento||'—';
+  document.getElementById('vAdmissao').textContent=data.data_admissao||'—';
+  document.getElementById('vEstado').textContent=data.ativo?'Ativo':'Inativo';
+  document.getElementById('vAdmin').textContent=data.is_admin?'Sim':'Não';
+  document.getElementById('vSenha').textContent=data.troca_senha?'Pendente (não trocou ainda)':'Trocada';
+  showModal('modalVerColab');
+}
+
+async function excluirColab(id, nome){
+  if(!confirm('Tem a certeza que deseja EXCLUIR o colaborador "'+nome+'"? Esta ação não pode ser revertida!')) return;
+  await sb.from('assinaturas_recibos').delete().eq('colaborador_id',id);
+  await sb.from('recibos').delete().eq('colaborador_id',id);
+  await sb.from('ponto').delete().eq('colaborador_id',id);
+  await sb.from('colaboradores').delete().eq('id',id);
+  loadAColab();
 }
 
 async function toggleAtivo(id, ativo){
