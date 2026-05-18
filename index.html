@@ -496,8 +496,8 @@ async function loadAColab(){
   const{data}=await sb.from('colaboradores').select('*').order('nome');
   const el=document.getElementById('aColabLista');
   if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem colaboradores</p>';return;}
-  el.innerHTML='<table><thead><tr><th>Nome</th><th>NIF</th><th>Cargo</th><th>1.º login</th><th>Admin</th><th>Estado</th></tr></thead><tbody>'+
-    data.map(c=>'<tr><td><strong>'+c.nome+'</strong></td><td>'+c.nif+'</td><td>'+(c.cargo||'—')+'</td><td>'+(c.troca_senha?'<span class="badge br2">Pendente</span>':'<span class="badge bg2">✓ Trocada</span>')+'</td><td>'+(c.is_admin?'<span class="badge ba2">Sim</span>':'Não')+'</td><td>'+(c.ativo?'<span class="badge bg2">Ativo</span>':'<span class="badge br2">Inativo</span>')+'</td></tr>').join('')+'</tbody></table>';
+  el.innerHTML='<table><thead><tr><th>Nome</th><th>NIF</th><th>Cargo</th><th>1.º login</th><th>Admin</th><th>Estado</th><th>Ação</th></tr></thead><tbody>'+
+    data.map(c=>'<tr><td><strong>'+c.nome+'</strong></td><td>'+c.nif+'</td><td>'+(c.cargo||'—')+'</td><td>'+(c.troca_senha?'<span class="badge br2">Pendente</span>':'<span class="badge bg2">✓ Trocada</span>')+'</td><td>'+(c.is_admin?'<span class="badge ba2">Sim</span>':'Não')+'</td><td>'+(c.ativo?'<span class="badge bg2">Ativo</span>':'<span class="badge br2">Inativo</span>')+'</td><td>'+(c.nif!=='000000000'?(c.ativo?'<button class="bs" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:#F09595" onclick="toggleAtivo(''+c.id+'',false)">Desativar</button>':'<button class="bs" style="font-size:11px;padding:4px 10px;color:var(--green);border-color:#9fd3a8" onclick="toggleAtivo(''+c.id+'',true)">Reativar</button>'):'—')+'</td></tr>').join('')+'</tbody></table>';
 }
 
 async function criarColab(){
@@ -562,6 +562,13 @@ async function publicarDoc(){
   msg.style.color='var(--green)';msg.textContent='Documento publicado!';
   ['aDTit','aDDesc','aDUrl'].forEach(id=>document.getElementById(id).value='');
   setTimeout(()=>{msg.textContent='';loadDocs();},3000);
+}
+
+async function toggleAtivo(id, ativo){
+  const acao = ativo ? 'reativar' : 'desativar';
+  if(!confirm('Tem a certeza que deseja '+acao+' este colaborador?')) return;
+  await sb.from('colaboradores').update({ativo}).eq('id',id);
+  loadAColab();
 }
 
 async function loadAssinaturas(){
