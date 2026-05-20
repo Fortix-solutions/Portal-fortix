@@ -188,7 +188,10 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
         </div>
       </div>
       <div class="cd">
-        <div class="ch"><div class="ct">Histórico de ponto</div></div>
+        <div class="ch">
+          <div class="ct">Histórico de ponto</div>
+          <button class="bs bb" onclick="exportarPontoExcel()" style="display:flex;align-items:center;gap:6px"><i class="ti ti-file-spreadsheet"></i> Exportar</button>
+        </div>
         <div id="pontoHist"><p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos</p></div>
       </div>
     </div>
@@ -257,21 +260,26 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
     </div>
 
     <div id="p-apontos" class="hidden">
-      <div class="pt">Relatório de ponto</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="pt">Relatório de ponto</div>
+        <button class="bs bb" onclick="exportarPontoExcel()" style="display:flex;align-items:center;gap:6px"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
+      </div>
       <div class="ps">Todos os registos de todos os colaboradores</div>
       <div class="cd"><div id="aPontosLista"><p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos</p></div></div>
     </div>
 
     <div id="p-arecibos" class="hidden">
       <div class="pt">Carregar recibos</div>
-      <div class="ps">Envie recibos para os colaboradores</div>
+      <div class="ps">Envie recibos para os colaboradores via PDF ou link</div>
       <div class="cd" style="max-width:500px">
         <div class="fi"><label>Colaborador</label><select id="aRColabSel"></select></div>
         <div class="fg" style="margin-bottom:10px">
           <div class="fi"><label>Mês</label><select id="aRMes"><option>Janeiro</option><option>Fevereiro</option><option>Março</option><option>Abril</option><option selected>Maio</option><option>Junho</option><option>Julho</option><option>Agosto</option><option>Setembro</option><option>Outubro</option><option>Novembro</option><option>Dezembro</option></select></div>
           <div class="fi"><label>Ano</label><input type="number" id="aRAno" value="2026" min="2020"/></div>
         </div>
-        <div class="fi"><label>Link do recibo</label><input type="text" id="aRUrl" placeholder="https://drive.google.com/..."/></div>
+        <div class="fi"><label>📎 Carregar PDF</label><input type="file" id="aRFile" accept=".pdf" style="background:#f9f8f5;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%"/></div>
+        <div style="text-align:center;font-size:12px;color:var(--text2);margin:8px 0">— ou —</div>
+        <div class="fi"><label>🔗 Link do recibo (Google Drive, etc.)</label><input type="text" id="aRUrl" placeholder="https://drive.google.com/..."/></div>
         <button class="bs bb" onclick="carregarRecibo()">Carregar recibo</button>
         <div id="aRMsg" style="margin-top:8px;font-size:13px"></div>
       </div>
