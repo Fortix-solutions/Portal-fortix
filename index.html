@@ -137,7 +137,7 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
       <div class="ni" id="n-apontos" onclick="showP('apontos')"><i class="ti ti-report"></i> Relatório pontos</div>
       <div class="ni" id="n-arecibos" onclick="showP('arecibos')"><i class="ti ti-upload"></i> Carregar recibos</div>
       <div class="ni" id="n-adocs" onclick="showP('adocs')"><i class="ti ti-file-plus"></i> Publicar documentos</div>
-      <div class="ni" id="n-assinaturas" onclick="showP('assinaturas')"><i class="ti ti-signature"></i> Assinaturas</div>
+      <div class="ni" id="n-assinaturas" onclick="showP('assinaturas')"><i class="ti ti-files"></i> Recibos Assinados</div>
     </div>
     <div class="nl" onclick="doLogout()"><i class="ti ti-logout"></i> Sair</div>
   </div>
@@ -287,20 +287,22 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
 
     <div id="p-adocs" class="hidden">
       <div class="pt">Publicar documentos</div>
-      <div class="ps">Partilhe documentos com todos os colaboradores</div>
+      <div class="ps">Partilhe documentos com todos os colaboradores via PDF ou link</div>
       <div class="cd" style="max-width:500px">
         <div class="fi"><label>Título</label><input type="text" id="aDTit" placeholder="Ex: Regulamento Interno"/></div>
         <div class="fi"><label>Descrição</label><input type="text" id="aDDesc" placeholder="Breve descrição..."/></div>
-        <div class="fi"><label>Link do documento</label><input type="text" id="aDUrl" placeholder="https://drive.google.com/..."/></div>
+        <div class="fi"><label>📎 Carregar PDF</label><input type="file" id="aDFile" accept=".pdf" style="background:#f9f8f5;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%"/></div>
+        <div style="text-align:center;font-size:12px;color:var(--text2);margin:8px 0">— ou —</div>
+        <div class="fi"><label>🔗 Link do documento</label><input type="text" id="aDUrl" placeholder="https://drive.google.com/..."/></div>
         <button class="bs bb" onclick="publicarDoc()">Publicar documento</button>
         <div id="aDMsg" style="margin-top:8px;font-size:13px"></div>
       </div>
     </div>
 
     <div id="p-assinaturas" class="hidden">
-      <div class="pt">Assinaturas de recibos</div>
-      <div class="ps">Consulte quem assinou e veja a assinatura</div>
-      <div class="cd"><div id="assLista"><p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem assinaturas</p></div></div>
+      <div class="pt">Recibos Assinados</div>
+      <div class="ps">Arquivo de recibos assinados pelos colaboradores, organizados por mês</div>
+      <div id="assLista"></div>
     </div>
   </div>
 </div>
