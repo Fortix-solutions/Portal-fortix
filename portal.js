@@ -111,6 +111,32 @@ async function loadDashboard(){
 
 function timeToMin(t){if(!t)return 0;const p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
 
+async function guardarPontoManual(){
+  const data=document.getElementById('mData').value;
+  const entrada=document.getElementById('mEntrada').value;
+  const inicio_pausa=document.getElementById('mInicioPausa').value;
+  const fim_pausa=document.getElementById('mFimPausa').value;
+  const saida=document.getElementById('mSaida').value;
+  const msg=document.getElementById('mMsg');
+  if(!data||!entrada){msg.style.color='var(--red)';msg.textContent='Data e entrada são obrigatórias.';setTimeout(()=>{msg.textContent='';},3000);return;}
+  let total_horas=null;
+  if(entrada&&saida){
+    const pm=inicio_pausa&&fim_pausa?timeToMin(fim_pausa)-timeToMin(inicio_pausa):0;
+    const tot=timeToMin(saida)-timeToMin(entrada)-pm;
+    if(tot>0)total_horas=Math.floor(tot/60)+'h'+String(tot%60).padStart(2,'0');
+  }
+  const{data:ex}=await sb.from('ponto').select('id').eq('colaborador_id',cu.id).eq('data',data).single();
+  if(ex){
+    await sb.from('ponto').update({entrada:entrada||null,inicio_pausa:inicio_pausa||null,fim_pausa:fim_pausa||null,saida:saida||null,total_horas}).eq('id',ex.id);
+  } else {
+    await sb.from('ponto').insert({colaborador_id:cu.id,data,entrada:entrada||null,inicio_pausa:inicio_pausa||null,fim_pausa:fim_pausa||null,saida:saida||null,total_horas});
+  }
+  if(total_horas)document.getElementById('totHoje').textContent=total_horas;
+  msg.style.color='var(--green)';msg.textContent='✅ Registo guardado!';
+  setTimeout(()=>{msg.textContent='';},3000);
+  loadPonto();
+}
+
 async function regP(tipo){
   const now=new Date();
   const data=now.toISOString().split('T')[0];
@@ -132,6 +158,17 @@ async function regP(tipo){
 }
 
 async function loadPonto(){
+  const today=new Date().toISOString().split('T')[0];
+  const mData=document.getElementById('mData');
+  if(mData&&!mData.value)mData.value=today;
+  const{data:hoje}=await sb.from('ponto').select('*').eq('colaborador_id',cu.id).eq('data',today).single();
+  if(hoje){
+    if(document.getElementById('mEntrada'))document.getElementById('mEntrada').value=hoje.entrada||'';
+    if(document.getElementById('mInicioPausa'))document.getElementById('mInicioPausa').value=hoje.inicio_pausa||'';
+    if(document.getElementById('mFimPausa'))document.getElementById('mFimPausa').value=hoje.fim_pausa||'';
+    if(document.getElementById('mSaida'))document.getElementById('mSaida').value=hoje.saida||'';
+    if(hoje.total_horas)document.getElementById('totHoje').textContent=hoje.total_horas;
+  }
   const{data}=await sb.from('ponto').select('*').eq('colaborador_id',cu.id).order('data',{ascending:false}).limit(20);
   document.getElementById('pontoHist').innerHTML=data&&data.length?renderPontoTable(data):'<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos</p>';
   const mes=new Date().getMonth()+1;
