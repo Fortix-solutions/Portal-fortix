@@ -248,7 +248,7 @@ async function loadDocs(){
   if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem;grid-column:1/-1">Sem documentos</p>';return;}
   let html='';
   data.forEach(d=>{
-    html+='<div style="border:1px solid var(--border);border-radius:10px;padding:1rem;cursor:pointer;transition:.15s" onmouseover="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow=''">';
+    html+='<div style="border:1px solid var(--border);border-radius:10px;padding:1rem;cursor:pointer">';
     html+='<i class="ti ti-file-description" style="font-size:28px;color:var(--blue);display:block;margin-bottom:8px"></i>';
     html+='<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+d.titulo+'</div>';
     html+='<div style="font-size:12px;color:var(--text2);margin-bottom:10px">'+(d.descricao||'')+'</div>';
