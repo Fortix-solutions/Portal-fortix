@@ -563,7 +563,7 @@ async function loadAssinaturas(){
         html+='<img src="'+a.assinatura_img+'" style="height:45px;border:1px solid var(--border);border-radius:6px;background:#fff;display:block"/>';
         html+='</div>';
       }
-      html+='<button onclick="excluirAssinatura(\"'+a.id+'\")" style="background:var(--redl);color:var(--red);border:1px solid #F09595;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class=\"ti ti-trash\"></i> Excluir</button>';
+      html+='<button data-id="'+a.id+'" class="btn-del-ass" style="background:var(--redl);color:var(--red);border:1px solid #F09595;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-trash"></i> Excluir</button>';
       if(a.recibos?.ficheiro_url){
         html+='<a href="'+a.recibos.ficheiro_url+'" target="_blank" class="bs bb" style="text-decoration:none;font-size:12px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-file-text"></i> Ver recibo</a>';
       }
