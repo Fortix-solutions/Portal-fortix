@@ -245,10 +245,13 @@ async function saveSig(){
 async function loadDocs(){
   const{data}=await sb.from('documentos').select('*').order('criado_em',{ascending:false});
   const el=document.getElementById('docsGrid');
-  if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem;grid-column:1/-1">Sem documentos</p>';return;}
+  if(!data||!data.length){
+    el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem;grid-column:1/-1">Sem documentos</p>';
+    return;
+  }
   let html='';
-  data.forEach(d=>{
-    html+='<div style="border:1px solid var(--border);border-radius:10px;padding:1rem;position:relative">';
+  data.forEach(function(d){
+    html+='<div style="border:1px solid var(--border);border-radius:10px;padding:1rem">';
     html+='<i class="ti ti-file-description" style="font-size:28px;color:var(--blue);display:block;margin-bottom:8px"></i>';
     html+='<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+d.titulo+'</div>';
     html+='<div style="font-size:12px;color:var(--text2);margin-bottom:10px">'+(d.descricao||'')+'</div>';
@@ -257,11 +260,14 @@ async function loadDocs(){
       html+='<a href="'+d.ficheiro_url+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:var(--blue);color:#fff;text-decoration:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:500"><i class="ti ti-external-link"></i> Abrir</a>';
     }
     if(cu&&cu.is_admin){
-      html+='<button onclick="excluirDoc(\"'+d.id+'\")" style="display:inline-flex;align-items:center;gap:5px;background:var(--redl);color:var(--red);border:1px solid #F09595;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-trash"></i> Excluir</button>';
+      html+='<button data-id="'+d.id+'" class="btn-del-doc" style="display:inline-flex;align-items:center;gap:5px;background:var(--redl);color:var(--red);border:1px solid #F09595;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-trash"></i> Excluir</button>';
     }
     html+='</div></div>';
   });
   el.innerHTML=html;
+  el.querySelectorAll('.btn-del-doc').forEach(function(btn){
+    btn.addEventListener('click',function(){excluirDoc(btn.dataset.id);});
+  });
 }
 
 async function loadFicha(){
