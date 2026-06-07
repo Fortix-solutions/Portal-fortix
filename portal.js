@@ -578,13 +578,13 @@ function exportarPontoExcel(){
   const el=document.getElementById('aPontosLista')||document.getElementById('pontoHist');
   const table=el?el.querySelector('table'):null;
   if(!table){alert('Sem dados para exportar');return;}
-  let csv='Colaborador,Data,Entrada,Início Pausa,Fim Pausa,Saída,Total\n';
+  let csv='Colaborador,Data,Entrada,Inicio Pausa,Fim Pausa,Saida,Total\n';
   const rows=table.querySelectorAll('tbody tr');
-  rows.forEach(r=>{
+  rows.forEach(function(r){
     const cells=r.querySelectorAll('td');
     const vals=[];
     for(let i=0;i<Math.min(cells.length,7);i++){
-      vals.push('"'+(cells[i].textContent.trim().replace(/"/g,"'"))+'"');
+      vals.push(cells[i].textContent.trim());
     }
     csv+=vals.join(',')+('\n');
   });
