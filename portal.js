@@ -531,7 +531,16 @@ async function publicarDoc(){
 async function verColab(id){
   const{data}=await sb.from('colaboradores').select('*').eq('id',id).maybeSingle();
   if(!data)return;
-  const{data:ficha}=await sb.from('fichas').select('*').eq('colaborador_id',id).maybeSingle();
+  // Try by colaborador_id first, then by nif as fallback
+  let{data:ficha}=await sb.from('fichas').select('*').eq('colaborador_id',id).maybeSingle();
+  if(!ficha && data.nif){
+    const{data:fichaByNif}=await sb.from('fichas').select('*').eq('nif',data.nif).maybeSingle();
+    ficha=fichaByNif;
+    // If found by nif, update colaborador_id
+    if(ficha && !ficha.colaborador_id){
+      await sb.from('fichas').update({colaborador_id:id}).eq('nif',data.nif);
+    }
+  }
 
   let html='';
   html+='<div style="margin-bottom:12px">';
