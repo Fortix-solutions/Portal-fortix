@@ -75,6 +75,11 @@ function showP(page){
   if(page==='arecibos')loadARForm();
   if(page==='dash')loadDashboard();
   if(page==='assinaturas')loadAssinaturas();
+  if(page==='relatorio')initRelatorio();
+  if(page==='epis')loadEPIs();
+  if(page==='alertas')loadAlertas();
+  if(page==='meusepis')loadMeusEPIs();
+  if(page==='meusdocs')loadMeusDocs();
 }
 
 async function loadDashboard(){
@@ -883,3 +888,379 @@ document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.
   const s=localStorage.getItem('fx_user');
   if(s){try{cu=JSON.parse(s);iniciarPortal();}catch(e){}}
 })();
+
+// ─────────────────────────────────────────────────────
+// RELATÓRIO MENSAL DE HORAS
+// ─────────────────────────────────────────────────────
+async function initRelatorio(){
+  const sel=document.getElementById('relMes');
+  if(!sel)return;
+  const now=new Date();
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const val=d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'));
+    const label=d.toLocaleDateString('pt-PT',{month:'long',year:'numeric'});
+    const opt=document.createElement('option');
+    opt.value=val;opt.textContent=label;
+    sel.appendChild(opt);
+  }
+  const selC=document.getElementById('relColab');
+  const{data:colabs}=await sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome');
+  if(colabs)colabs.forEach(c=>{
+    const o=document.createElement('option');o.value=c.id;o.textContent=c.nome;selC.appendChild(o);
+  });
+  loadRelatorio();
+}
+
+async function loadRelatorio(){
+  const mes=document.getElementById('relMes')?.value||'';
+  const colabId=document.getElementById('relColab')?.value||'';
+  if(!mes)return;
+  const[ano,m]=mes.split('-');
+  const inicio=mes+'-01';
+  const fim=new Date(parseInt(ano),parseInt(m),0).toISOString().split('T')[0];
+  let query=sb.from('ponto').select('*,colaboradores(nome)').gte('data',inicio).lte('data',fim);
+  if(colabId)query=query.eq('colaborador_id',colabId);
+  const{data}=await query;
+  if(!data){return;}
+
+  // Group by colaborador
+  const map={};
+  data.forEach(r=>{
+    const nome=r.colaboradores?.nome||'—';
+    const cid=r.colaborador_id;
+    if(!map[cid])map[cid]={nome,dias:0,horas:0,faltas:0};
+    map[cid].dias++;
+    const h=parseFloat(r.total_horas)||0;
+    map[cid].horas+=h;
+  });
+
+  const vals=Object.values(map);
+  const totalH=vals.reduce((a,b)=>a+b.horas,0);
+  const totalD=vals.reduce((a,b)=>a+b.dias,0);
+
+  document.getElementById('relStats').innerHTML=`
+    <div style="background:var(--blu);border-radius:8px;padding:1rem">
+      <div style="font-size:12px;color:var(--text2)">Total horas</div>
+      <div style="font-size:22px;font-weight:600;color:var(--blue)">${totalH.toFixed(1)}h</div>
+    </div>
+    <div style="background:var(--blu);border-radius:8px;padding:1rem">
+      <div style="font-size:12px;color:var(--text2)">Registos</div>
+      <div style="font-size:22px;font-weight:600;color:var(--blue)">${totalD}</div>
+    </div>
+    <div style="background:var(--blu);border-radius:8px;padding:1rem">
+      <div style="font-size:12px;color:var(--text2)">Colaboradores</div>
+      <div style="font-size:22px;font-weight:600;color:var(--blue)">${vals.length}</div>
+    </div>`;
+
+  let rows='';
+  vals.forEach(v=>{
+    const media=v.dias>0?(v.horas/v.dias).toFixed(1):'0';
+    const badge=v.horas>=160?'bg2':v.horas>=120?'ba2':'br2';
+    rows+=`<tr>
+      <td><strong>${v.nome}</strong></td>
+      <td style="text-align:center">${v.dias}</td>
+      <td style="text-align:center"><span class="badge ${badge}">${v.horas.toFixed(1)}h</span></td>
+      <td style="text-align:center">${media}h</td>
+    </tr>`;
+  });
+
+  document.getElementById('relTabela').innerHTML=`
+    <table><thead><tr>
+      <th>Colaborador</th><th>Dias</th><th>Total horas</th><th>Média/dia</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ─────────────────────────────────────────────────────
+// GESTÃO DE EPIs
+// ─────────────────────────────────────────────────────
+async function loadEPIs(){
+  const{data}=await sb.from('epis').select('*,colaboradores(nome)').order('data_entrega',{ascending:false});
+  const el=document.getElementById('episTabela');
+  if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos de EPIs</p>';return;}
+
+  const now=new Date();
+  let urgente=0,atencao=0;
+  let rows='';
+  data.forEach(r=>{
+    const nome=r.colaboradores?.nome||'—';
+    const entrega=r.data_entrega?new Date(r.data_entrega):null;
+    let meses=0;
+    if(entrega)meses=(now-entrega)/(1000*60*60*24*30);
+    let badge='',estado='';
+    if(meses>=12){badge='badge br2';estado='Renovar';urgente++;}
+    else if(meses>=6){badge='badge ba2';estado='Atenção';atencao++;}
+    else{badge='badge bg2';estado='OK';}
+    rows+=`<tr>
+      <td><strong>${nome}</strong></td>
+      <td>${r.tipo||'—'}</td>
+      <td style="text-align:center">${r.tamanho||'—'}</td>
+      <td style="text-align:center">${r.data_entrega||'—'}</td>
+      <td style="text-align:center">${r.proximo_renovacao||'—'}</td>
+      <td style="text-align:center"><span class="${badge}">${estado}</span></td>
+      <td style="text-align:center">${r.assinado?'<i class="ti ti-circle-check" style="color:#3B6D11"></i>':'<i class="ti ti-circle-x" style="color:#E24B4A"></i>'}</td>
+      <td style="text-align:center"><button class="bs" style="font-size:11px;padding:3px 8px" onclick="eliminarEPI('${r.id}')"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  });
+
+  document.getElementById('episStats').innerHTML=`
+    <div style="background:var(--blu);border-radius:8px;padding:1rem">
+      <div style="font-size:12px;color:var(--text2)">Total entregas</div>
+      <div style="font-size:22px;font-weight:600;color:var(--blue)">${data.length}</div>
+    </div>
+    <div style="background:#FCEBEB;border-radius:8px;padding:1rem">
+      <div style="font-size:12px;color:#A32D2D">A renovar</div>
+      <div style="font-size:22px;font-weight:600;color:#E24B4A">${urgente}</div>
+    </div>
+    <div style="background:#FAEEDA;border-radius:8px;padding:1rem">
+      <div style="font-size:12px;color:#854F0B">Atenção</div>
+      <div style="font-size:22px;font-weight:600;color:#BA7517">${atencao}</div>
+    </div>`;
+
+  el.innerHTML=`<table><thead><tr>
+    <th>Colaborador</th><th>EPI</th><th>Tam.</th><th>Entrega</th><th>Renovação</th><th>Estado</th><th>Assinado</th><th></th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function abrirModalEPI(){
+  const modal=document.createElement('div');
+  modal.id='modalEPI';
+  modal.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+    <div style="background:#fff;border-radius:16px;padding:1.5rem;max-width:480px;width:100%">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div style="font-size:16px;font-weight:600">Registar entrega EPI</div>
+        <button onclick="document.getElementById('modalEPI').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Colaborador</label>
+          <select id="epi_colab" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px">
+            <option value="">Selecionar...</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Tipo de EPI</label>
+          <select id="epi_tipo" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px">
+            <option value="">Selecionar...</option>
+            <option>Botas de segurança</option>
+            <option>Fato de trabalho</option>
+            <option>Luvas</option>
+            <option>Capacete</option>
+            <option>Colete refletor</option>
+            <option>Óculos de proteção</option>
+            <option>Arnês</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Tamanho</label>
+          <input id="epi_tam" placeholder="Ex: 42, M, L" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Data de entrega</label>
+          <input id="epi_data" type="date" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Próx. renovação</label>
+          <input id="epi_renov" type="date" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:18px">
+          <input type="checkbox" id="epi_assn" style="width:16px;height:16px" />
+          <label for="epi_assn" style="font-size:13px;color:#555">Colaborador assinou</label>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:1rem;justify-content:flex-end">
+        <button onclick="document.getElementById('modalEPI').remove()" style="padding:9px 20px;border-radius:8px;border:1px solid #d4d2ca;background:#fff;cursor:pointer;font-size:13px">Cancelar</button>
+        <button onclick="guardarEPI()" style="padding:9px 20px;border-radius:8px;border:none;background:#152B55;color:#fff;cursor:pointer;font-size:13px;font-weight:500">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  // Populate colaboradores
+  sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome').then(({data})=>{
+    if(data)data.forEach(c=>{
+      const o=document.createElement('option');o.value=c.id;o.textContent=c.nome;
+      document.getElementById('epi_colab').appendChild(o);
+    });
+  });
+  // Set today
+  document.getElementById('epi_data').value=new Date().toISOString().split('T')[0];
+}
+
+async function guardarEPI(){
+  const cid=document.getElementById('epi_colab').value;
+  const tipo=document.getElementById('epi_tipo').value;
+  const tam=document.getElementById('epi_tam').value;
+  const data=document.getElementById('epi_data').value;
+  const renov=document.getElementById('epi_renov').value;
+  const assn=document.getElementById('epi_assn').checked;
+  if(!cid||!tipo||!data){alert('Preencha colaborador, tipo e data.');return;}
+  const{error}=await sb.from('epis').insert({colaborador_id:cid,tipo,tamanho:tam,data_entrega:data,proximo_renovacao:renov||null,assinado:assn});
+  if(error){alert('Erro: '+error.message);return;}
+  document.getElementById('modalEPI').remove();
+  loadEPIs();
+  toast('EPI registado!');
+}
+
+async function eliminarEPI(id){
+  if(!confirm('Eliminar este registo de EPI?'))return;
+  await sb.from('epis').delete().eq('id',id);
+  loadEPIs();
+  toast('EPI eliminado');
+}
+
+// ─────────────────────────────────────────────────────
+// ALERTAS DE DOCUMENTOS
+// ─────────────────────────────────────────────────────
+async function loadAlertas(){
+  const el=document.getElementById('alertasContent');
+  const{data}=await sb.from('fichas').select('nif,validade_doc,tipo_doc,colaborador_id,colaboradores(nome,email)').not('validade_doc','is',null);
+  if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem documentos registados</p>';return;}
+
+  const now=new Date();
+  const urgentes=[];const atencao=[];const ok=[];
+
+  data.forEach(r=>{
+    if(!r.validade_doc)return;
+    const validade=new Date(r.validade_doc);
+    const dias=Math.round((validade-now)/(1000*60*60*24));
+    const nome=r.colaboradores?.nome||'—';
+    const email=r.colaboradores?.email||'';
+    const tipo=r.tipo_doc||'Documento';
+    const item={nome,email,tipo,validade:r.validade_doc,dias,nif:r.nif};
+    if(dias<=30)urgentes.push(item);
+    else if(dias<=90)atencao.push(item);
+    else ok.push(item);
+  });
+
+  let html='';
+  if(urgentes.length){
+    html+=`<div style="font-size:14px;font-weight:600;color:#A32D2D;margin-bottom:8px;margin-top:8px"><i class="ti ti-alert-triangle"></i> Urgente — expira em menos de 30 dias</div>`;
+    urgentes.forEach(i=>{
+      html+=`<div style="background:#fff;border:0.5px solid #F09595;border-left:3px solid #E24B4A;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div><strong>${i.nome}</strong> — ${i.tipo}<br><span style="font-size:12px;color:#A32D2D">Expira em ${i.dias} dias (${i.validade})</span></div>
+        <button class="bs" style="font-size:12px;padding:5px 10px;border-color:#F09595;color:#A32D2D" onclick="notificarDoc('${i.email}','${i.nome}','${i.tipo}','${i.dias}')"><i class="ti ti-mail"></i> Notificar</button>
+      </div>`;
+    });
+  }
+  if(atencao.length){
+    html+=`<div style="font-size:14px;font-weight:600;color:#854F0B;margin-bottom:8px;margin-top:12px"><i class="ti ti-clock"></i> Atenção — expira em menos de 90 dias</div>`;
+    atencao.forEach(i=>{
+      html+=`<div style="background:#fff;border:0.5px solid #FAC775;border-left:3px solid #BA7517;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div><strong>${i.nome}</strong> — ${i.tipo}<br><span style="font-size:12px;color:#854F0B">Expira em ${i.dias} dias (${i.validade})</span></div>
+        <button class="bs" style="font-size:12px;padding:5px 10px;border-color:#FAC775;color:#854F0B" onclick="notificarDoc('${i.email}','${i.nome}','${i.tipo}','${i.dias}')"><i class="ti ti-mail"></i> Notificar</button>
+      </div>`;
+    });
+  }
+  if(ok.length){
+    html+=`<div style="font-size:14px;font-weight:600;color:#3B6D11;margin-bottom:8px;margin-top:12px"><i class="ti ti-circle-check"></i> OK — mais de 90 dias</div>`;
+    ok.forEach(i=>{
+      html+=`<div style="background:#fff;border:0.5px solid #C0DD97;border-left:3px solid #639922;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+        <strong>${i.nome}</strong> — ${i.tipo}<span style="font-size:12px;color:#3B6D11;margin-left:8px">Válido até ${i.validade} (${i.dias} dias)</span>
+      </div>`;
+    });
+  }
+  if(!html)html='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Nenhum alerta</p>';
+  el.innerHTML=html;
+}
+
+async function notificarDoc(email,nome,tipo,dias){
+  if(!email){alert('Colaborador sem email registado.');return;}
+  // Send via EmailJS
+  emailjs.send('Fortix-portal','template_9cnwr2b',{
+    to_email:email,
+    to_name:nome,
+    message:`O seu documento (${tipo}) expira em ${dias} dias. Por favor contacte a administração para proceder à renovação.`,
+    subject:'Aviso: documento a expirar — Fortix Solutions'
+  }).then(()=>toast('Email enviado a '+nome)).catch(()=>alert('Erro ao enviar email'));
+}
+
+// ─────────────────────────────────────────────────────
+// DOCUMENTOS DA FICHA (ADM + Colaborador)
+// ─────────────────────────────────────────────────────
+async function loadMeusDocs(){
+  if(!cu)return;
+  const el=document.getElementById('meusdocsContent');
+  const{data}=await sb.from('documentos_ficha').select('*').eq('colaborador_id',cu.id).order('criado_em',{ascending:false});
+  if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;margin-bottom:1rem">Ainda não tem documentos carregados.</p>';return;}
+  let html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:1rem">';
+  data.forEach(d=>{
+    const icon=d.tipo==='identificacao'?'ti-id-badge':d.tipo==='iban'?'ti-building-bank':'ti-file-text';
+    const cor=d.tipo==='identificacao'?'#E6F1FB,#185FA5':d.tipo==='iban'?'#EAF3DE,#3B6D11':'#FAEEDA,#BA7517';
+    const [bg,fc]=cor.split(',');
+    html+=`<div style="background:#fff;border:0.5px solid #d4d2ca;border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px">
+      <div style="width:36px;height:36px;border-radius:8px;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="ti ${icon}" style="font-size:18px;color:${fc}"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500">${d.nome_ficheiro||d.tipo}</div>
+        <div style="font-size:11px;color:var(--text2)">${new Date(d.criado_em).toLocaleDateString('pt-PT')}</div>
+      </div>
+      <a href="${d.ficheiro_url}" target="_blank" style="color:var(--text2)"><i class="ti ti-eye" style="font-size:16px"></i></a>
+    </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+async function uploadDocColab(tipo){
+  const inputId=tipo==='identificacao'?'uploadDocId':'uploadDocIban';
+  const file=document.getElementById(inputId)?.files[0];
+  if(!file){alert('Selecione um ficheiro.');return;}
+  if(file.size>10*1024*1024){alert('Ficheiro demasiado grande. Máx. 10MB.');return;}
+  if(!cu)return;
+  const ext=file.name.split('.').pop();
+  const path=`docs-ficha/${cu.id}/${tipo}-${Date.now()}.${ext}`;
+  const{error:upErr}=await sb.storage.from('Documentos').upload(path,file,{upsert:true});
+  if(upErr){alert('Erro ao carregar: '+upErr.message);return;}
+  const{data:urlData}=sb.storage.from('Documentos').getPublicUrl(path);
+  await sb.from('documentos_ficha').insert({
+    colaborador_id:cu.id,
+    tipo,
+    nome_ficheiro:file.name,
+    ficheiro_url:urlData.publicUrl,
+    carregado_por:'colaborador'
+  });
+  toast('Documento carregado!');
+  loadMeusDocs();
+}
+
+async function loadMeusEPIs(){
+  if(!cu)return;
+  const el=document.getElementById('meusEpisContent');
+  const{data}=await sb.from('epis').select('*').eq('colaborador_id',cu.id).order('data_entrega',{ascending:false});
+  if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px">Sem EPIs registados.</p>';return;}
+  const now=new Date();
+  let html='<div style="display:flex;flex-direction:column;gap:8px">';
+  data.forEach(r=>{
+    const entrega=r.data_entrega?new Date(r.data_entrega):null;
+    let meses=0;
+    if(entrega)meses=(now-entrega)/(1000*60*60*24*30);
+    let badge='badge bg2',estado='OK',podeRenovar=false;
+    if(meses>=12){badge='badge br2';estado='Renovar';podeRenovar=true;}
+    else if(meses>=6){badge='badge ba2';estado='Atenção';podeRenovar=true;}
+    html+=`<div style="background:#fff;border:0.5px solid #d4d2ca;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <strong>${r.tipo||'—'}</strong> ${r.tamanho?'('+r.tamanho+')':''}
+        <div style="font-size:12px;color:var(--text2)">Entregue: ${r.data_entrega||'—'}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="${badge}">${estado}</span>
+        ${podeRenovar?`<button class="bs ba" style="font-size:12px;padding:4px 10px" onclick="pedirRenovacaoEPI('${r.tipo}')"><i class="ti ti-refresh"></i> Pedir renovação</button>`:''}
+      </div>
+    </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+async function pedirRenovacaoEPI(tipo){
+  // Send email to ADM
+  emailjs.send('Fortix-portal','template_9cnwr2b',{
+    to_email:'geral@fortix.pt',
+    to_name:'Administração Fortix',
+    message:`O colaborador ${cu.nome} solicita renovação do EPI: ${tipo}.`,
+    subject:`Pedido de renovação EPI — ${cu.nome}`
+  }).then(()=>toast('Pedido enviado à administração!')).catch(()=>alert('Erro ao enviar pedido'));
+}
+
