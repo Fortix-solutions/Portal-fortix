@@ -402,6 +402,97 @@ async function loadAColab(){
   });
 }
 
+function editarDadosAdm(id){
+  // Find colab data
+  const data = window._colabData ? window._colabData.find(c=>c.id===id) : null;
+  const d = data || {};
+  
+  const modal = document.createElement('div');
+  modal.id = 'modalEditAdm';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:1.5rem;max-width:500px;width:100%;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div style="font-size:16px;font-weight:600;color:#1a1a18"><i class="ti ti-pencil"></i> Editar dados profissionais</div>
+        <button onclick="document.getElementById('modalEditAdm').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Cargo</label>
+          <input id="ea_cargo" value="${d.cargo||''}" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Departamento</label>
+          <select id="ea_dep" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px">
+            ${['Administração','Comercial','Financeiro','Logística','Operações','Recursos Humanos','Tecnologia','Outro'].map(o=>`<option value="${o}" ${d.departamento===o?'selected':''}>${o}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Data admissão</label>
+          <input id="ea_admissao" type="date" value="${d.data_admissao||''}" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Tipo contrato</label>
+          <select id="ea_contrato" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px">
+            ${['','Sem termo (efetivo)','A termo certo','A termo incerto','Prestação de serviços','Estágio profissional'].map(o=>`<option value="${o}" ${d.tipo_contrato===o?'selected':''}>${o||'Selecionar...'}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Salário base (€)</label>
+          <input id="ea_salario" type="number" value="${d.salario_base||''}" placeholder="Ex: 1200" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Preço H.H (€/hora)</label>
+          <input id="ea_hh" type="number" step="0.01" value="${d.preco_hh||''}" placeholder="Ex: 18.50" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Horário</label>
+          <select id="ea_horario" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px">
+            ${['','08h–17h','09h–18h','Turnos rotativos','Part-time','Flexível'].map(o=>`<option value="${o}" ${d.horario===o?'selected':''}>${o||'Selecionar...'}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">N.º colaborador</label>
+          <input id="ea_num" value="${d.num_colaborador||''}" placeholder="Ex: COL-0042" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px" />
+        </div>
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#555;font-weight:500">Notas internas</label>
+          <textarea id="ea_notas" style="border:1px solid #d4d2ca;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;min-height:60px">${d.notas_adm||''}</textarea>
+        </div>
+      </div>
+      <div id="ea_erro" style="display:none;background:#FCEBEB;border:1px solid #F09595;border-radius:8px;padding:10px;font-size:13px;color:#A32D2D;margin-top:10px"></div>
+      <div style="display:flex;gap:8px;margin-top:1rem;justify-content:flex-end">
+        <button onclick="document.getElementById('modalEditAdm').remove()" style="padding:9px 20px;border-radius:8px;border:1px solid #d4d2ca;background:#fff;cursor:pointer;font-size:13px">Cancelar</button>
+        <button onclick="guardarEditAdm('${id}')" style="padding:9px 20px;border-radius:8px;border:none;background:#152B55;color:#fff;cursor:pointer;font-size:13px;font-weight:500">Guardar alterações</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function guardarEditAdm(id){
+  const payload = {
+    cargo:          document.getElementById('ea_cargo').value.trim(),
+    departamento:   document.getElementById('ea_dep').value,
+    data_admissao:  document.getElementById('ea_admissao').value,
+    tipo_contrato:  document.getElementById('ea_contrato').value,
+    salario_base:   document.getElementById('ea_salario').value || null,
+    preco_hh:       document.getElementById('ea_hh').value || null,
+    horario:        document.getElementById('ea_horario').value,
+    num_colaborador:document.getElementById('ea_num').value.trim(),
+    notas_adm:      document.getElementById('ea_notas').value.trim()
+  };
+  const{error}=await sb.from('colaboradores').update(payload).eq('id',id);
+  if(error){
+    document.getElementById('ea_erro').style.display='block';
+    document.getElementById('ea_erro').textContent='Erro ao guardar: '+error.message;
+    return;
+  }
+  document.getElementById('modalEditAdm').remove();
+  // Refresh view
+  verColab(id);
+  toast('Dados profissionais atualizados!');
+}
+
 async function criarColab(){
   const nome=document.getElementById('nNome').value.trim();
   const nif=document.getElementById('nNif').value.trim();
@@ -545,12 +636,19 @@ async function verColab(id){
   let html='';
   html+='<div style="margin-bottom:12px">';
   html+='<div class="fsec"><i class="ti ti-briefcase"></i> Dados profissionais</div>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  html+='<div class="fsec" style="margin-bottom:0;border:none"><i class="ti ti-briefcase"></i> Dados profissionais</div>';
+  html+='<button onclick="editarDadosAdm(\''+id+'\')" class="bs ba" style="font-size:11px;padding:4px 10px;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-pencil"></i> Editar</button>';
+  html+='</div>';
   html+='<div class="fr"><span class="fl">Nome</span><span>'+data.nome+'</span></div>';
   html+='<div class="fr"><span class="fl">NIF</span><span>'+data.nif+'</span></div>';
   html+='<div class="fr"><span class="fl">Email</span><span>'+(data.email||'—')+'</span></div>';
   html+='<div class="fr"><span class="fl">Cargo</span><span>'+(data.cargo||'—')+'</span></div>';
   html+='<div class="fr"><span class="fl">Departamento</span><span>'+(data.departamento||'—')+'</span></div>';
   html+='<div class="fr"><span class="fl">Data admissão</span><span>'+(data.data_admissao||'—')+'</span></div>';
+  html+='<div class="fr"><span class="fl">Salário base</span><span>'+(data.salario_base?data.salario_base+' €':'—')+'</span></div>';
+  html+='<div class="fr"><span class="fl">Preço H.H</span><span>'+(data.preco_hh?data.preco_hh+' €/hora':'—')+'</span></div>';
+  html+='<div class="fr"><span class="fl">Tipo contrato</span><span>'+(data.tipo_contrato||'—')+'</span></div>';
   html+='<div class="fr"><span class="fl">Estado</span><span>'+(data.ativo?'Ativo':'Inativo')+'</span></div>';
   html+='<div class="fr"><span class="fl">Administrador</span><span>'+(data.is_admin?'Sim':'Não')+'</span></div>';
   html+='</div>';
