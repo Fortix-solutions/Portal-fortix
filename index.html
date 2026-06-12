@@ -170,6 +170,7 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
       <div class="ni" id="n-meusdocs" onclick="showP('meusdocs')"><i class="ti ti-files"></i> <span class="ni-text">Meus documentos</span></div>
       <div class="ni" id="n-meusepis" onclick="showP('meusepis')"><i class="ti ti-shield-check"></i> <span class="ni-text">Meus EPIs</span></div>
     </div>
+    </div>
     <div id="admNav" class="hidden">
       <div class="nav-sep" onclick="toggleNavSection('admItems','chevAdm')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">
         <span>Administração</span>
@@ -185,8 +186,8 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
       <div class="ni" id="n-ausencias" onclick="showP('ausencias')"><i class="ti ti-calendar-off"></i> <span class="ni-text">Ausências</span></div>
       <div class="ni" id="n-epis" onclick="showP('epis')"><i class="ti ti-shield-check"></i> <span class="ni-text">Gestão EPIs</span></div>
       <div class="ni" id="n-alertas" onclick="showP('alertas')"><i class="ti ti-bell"></i> <span class="ni-text">Alertas docs</span></div>
-    </div>
       </div>
+    </div>
     </div>
     <div class="nl" onclick="doLogout()"><i class="ti ti-logout"></i> Sair</div>
   </div>
@@ -408,6 +409,11 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
         <button class="bs bb" onclick="publicarDoc()">Publicar documento</button>
         <div id="aDMsg" style="margin-top:8px;font-size:13px"></div>
       </div>
+    </div>
+
+    <div id="p-dashadm" class="hidden">
+      <div class="pt">Dashboard ADM</div>
+      <div id="dashAdmContent"></div>
     </div>
 
     <div id="p-ausencias" class="hidden">
