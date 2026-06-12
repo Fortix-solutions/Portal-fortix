@@ -1326,11 +1326,12 @@ async function notificarDoc(email,nome,tipo,dias){
   if(!email){alert('Colaborador sem email registado.');return;}
   // Send via EmailJS
   emailjs.send(EJ_SERVICE,'template_ype66ih',{
+    name:nome,
+    email:email,
     nome:nome,
     email_destino:email,
     assunto:'Aviso: documento a expirar — Fortix Solutions',
-    mensagem:`O seu documento (${tipo}) expira em ${dias} dias. Por favor contacte a administração para proceder à renovação.`,
-    nif:'—',senha:'—'
+    mensagem:`O seu documento (${tipo}) expira em ${dias} dias. Por favor contacte a administração para proceder à renovação.`
   }).then(()=>toast('✅ Email enviado a '+nome)).catch(e=>{
     console.error('EmailJS error:',e);
     toast('Erro ao enviar email','erro');
@@ -1471,12 +1472,12 @@ async function confirmarRecebimentoEPI(epiId){
 async function pedirRenovacaoEPI(tipo){
   // Send email to ADM
   emailjs.send(EJ_SERVICE,'template_ype66ih',{
+    name:cu.nome,
+    email:cu.email||'geral@fortix.pt',
     nome:'Administração Fortix',
     email_destino:'geral@fortix.pt',
     assunto:`Pedido de renovação EPI — ${cu.nome}`,
-    mensagem:`O colaborador ${cu.nome} (NIF: ${cu.nif}) solicita renovação do EPI: ${tipo}.`,
-    nif:cu.nif||'—',
-    senha:'—'
+    mensagem:`O colaborador ${cu.nome} (NIF: ${cu.nif}) solicita renovação do EPI: ${tipo}.`
   }).then(()=>toast('✅ Pedido enviado à administração!')).catch(e=>{
     console.error('EmailJS error:',e);
     toast('Erro ao enviar. Tente novamente.','erro');
