@@ -1325,7 +1325,7 @@ async function loadAlertas(){
 async function notificarDoc(email,nome,tipo,dias){
   if(!email){alert('Colaborador sem email registado.');return;}
   // Send via EmailJS
-  emailjs.send(EJ_SERVICE,'template_ype66ih',{
+  emailjs.send(EJ_SERVICE,'template_ype66lh',{
     name:nome,
     email:email,
     nome:nome,
@@ -1471,7 +1471,7 @@ async function confirmarRecebimentoEPI(epiId){
 
 async function pedirRenovacaoEPI(tipo){
   // Send email to ADM
-  emailjs.send(EJ_SERVICE,'template_ype66ih',{
+  emailjs.send(EJ_SERVICE,'template_ype66lh',{
     name:cu.nome,
     email:cu.email||'geral@fortix.pt',
     nome:'Administração Fortix',
