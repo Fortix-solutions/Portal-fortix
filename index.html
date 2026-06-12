@@ -377,9 +377,14 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
     </div>
 
     <div id="p-epis" class="hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
         <div class="pt">Gestão de EPIs</div>
-        <button class="bs bb" onclick="abrirModalEPI()"><i class="ti ti-plus"></i> Registar entrega</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="epiFilterColab" onchange="loadEPIs()" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #d4d2ca">
+            <option value="">Todos os colaboradores</option>
+          </select>
+          <button class="bs bb" onclick="abrirModalEPI()"><i class="ti ti-plus"></i> Registar entrega</button>
+        </div>
       </div>
       <div id="episStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1rem"></div>
       <div id="episTabela"></div>
