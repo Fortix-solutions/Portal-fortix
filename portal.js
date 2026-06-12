@@ -36,7 +36,8 @@ function iniciarPortal(){
   document.getElementById('dashTitle').textContent='Bem-vindo, '+cu.nome+'! 👋';
   if(cu.is_admin)document.getElementById('admNav').classList.remove('hidden');
   if(cu.troca_senha)showModal('modalSenha');
-  startClock();showP('dash');loadDashboard();
+  startClock();showP('dash');
+  initNotificacoes();loadDashboard();
 }
 
 async function trocarSenha(){
@@ -82,13 +83,14 @@ function showP(page){
   if(page==='acolab')loadAColab();
   if(page==='apontos')loadAPontos();
   if(page==='arecibos')loadARForm();
-  if(page==='dash')loadDashboard();
+  if(page==='dash'){loadDashboard();if(cu&&cu.is_admin)loadDashAdm();}
   if(page==='assinaturas')loadAssinaturas();
   if(page==='relatorio')initRelatorio();
   if(page==='epis')initEPIs();
   if(page==='alertas')loadAlertas();
   if(page==='meusepis')loadMeusEPIs();
   if(page==='meusdocs')loadMeusDocs();
+  if(page==='ausencias')initAusencias();
 }
 
 async function loadDashboard(){
@@ -1500,3 +1502,305 @@ async function pedirRenovacaoEPI(tipo, tamanho){
   });
 }
 
+
+// ─────────────────────────────────────────────────────
+// MENU COLAPSÁVEL
+// ─────────────────────────────────────────────────────
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const icon=document.getElementById('sidebarIcon');
+  sb.classList.toggle('collapsed');
+  if(sb.classList.contains('collapsed')){
+    icon.className='ti ti-layout-sidebar-left-expand';
+  } else {
+    icon.className='ti ti-layout-sidebar-left-collapse';
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// NOTIFICAÇÕES
+// ─────────────────────────────────────────────────────
+function toggleNotifPanel(e){
+  if(e)e.stopPropagation();
+  const panel=document.getElementById('notifPanel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open'))loadNotificacoes();
+}
+
+document.addEventListener('click',function(e){
+  const panel=document.getElementById('notifPanel');
+  const bell=document.getElementById('notifBell');
+  if(panel && bell && !panel.contains(e.target) && !bell.contains(e.target)){
+    panel.classList.remove('open');
+  }
+});
+
+async function loadNotificacoes(){
+  if(!cu)return;
+  const{data}=await sb.from('notificacoes').select('*').eq('colaborador_id',cu.id).order('criado_em',{ascending:false}).limit(20);
+  const lista=document.getElementById('notifLista');
+  const badge=document.getElementById('notifBadge');
+  if(!data||!data.length){
+    if(lista)lista.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2);font-size:13px"><i class="ti ti-bell-off" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4"></i>Sem notificações</div>';
+    if(badge)badge.style.display='none';
+    return;
+  }
+  const naoLidas=data.filter(n=>!n.lida).length;
+  if(badge){
+    badge.textContent=naoLidas;
+    badge.style.display=naoLidas>0?'flex':'none';
+  }
+  const icons={recibo:'ti-file-invoice',epi:'ti-shield-check',documento:'ti-id-badge',ficha:'ti-id-badge-2'};
+  const cores={recibo:'#FCEBEB,#E24B4A',epi:'#FAEEDA,#BA7517',documento:'#FCEBEB,#E24B4A',ficha:'#FAEEDA,#BA7517'};
+  let html='';
+  data.forEach(n=>{
+    const [bg,fc]=(cores[n.tipo]||'#f9f8f5,#555').split(',');
+    const icon=icons[n.tipo]||'ti-bell';
+    const tempo=new Date(n.criado_em).toLocaleDateString('pt-PT');
+    html+=`<div class="notif-item ${n.lida?'':'unread'}" onclick="lerNotificacao('${n.id}',this)">
+      <div style="width:34px;height:34px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="ti ${icon}" style="font-size:16px;color:${fc}"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:${n.lida?'400':'600'};color:var(--text)">${n.titulo}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${n.mensagem}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">${tempo}</div>
+      </div>
+    </div>`;
+  });
+  if(lista)lista.innerHTML=html;
+}
+
+async function lerNotificacao(id,el){
+  await sb.from('notificacoes').update({lida:true}).eq('id',id);
+  if(el)el.classList.remove('unread');
+  // Update badge
+  const badge=document.getElementById('notifBadge');
+  if(badge){
+    const count=parseInt(badge.textContent)||0;
+    const newCount=Math.max(0,count-1);
+    badge.textContent=newCount;
+    badge.style.display=newCount>0?'flex':'none';
+  }
+}
+
+async function marcarTodasLidas(){
+  if(!cu)return;
+  await sb.from('notificacoes').update({lida:true}).eq('colaborador_id',cu.id).eq('lida',false);
+  loadNotificacoes();
+  toast('Notificações marcadas como lidas');
+}
+
+async function criarNotificacao(colaboradorId,tipo,titulo,mensagem){
+  await sb.from('notificacoes').insert({colaborador_id:colaboradorId,tipo,titulo,mensagem});
+}
+
+async function initNotificacoes(){
+  if(!cu)return;
+  const bell=document.getElementById('notifBell');
+  if(bell)bell.style.display='flex';
+  // Count unread
+  const{count}=await sb.from('notificacoes').select('*',{count:'exact',head:true}).eq('colaborador_id',cu.id).eq('lida',false);
+  const badge=document.getElementById('notifBadge');
+  if(badge){
+    badge.textContent=count||0;
+    badge.style.display=(count&&count>0)?'flex':'none';
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// RELATÓRIO DE AUSÊNCIAS
+// ─────────────────────────────────────────────────────
+async function initAusencias(){
+  const sel=document.getElementById('ausMes');
+  if(!sel)return;
+  if(sel.options.length===0){
+    const now=new Date();
+    for(let i=0;i<12;i++){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      const val=d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'));
+      const label=d.toLocaleDateString('pt-PT',{month:'long',year:'numeric'});
+      const opt=document.createElement('option');
+      opt.value=val;opt.textContent=label;
+      sel.appendChild(opt);
+    }
+  }
+  const selC=document.getElementById('ausColab');
+  if(selC && selC.options.length<=1){
+    const{data:colabs}=await sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome');
+    if(colabs)colabs.forEach(c=>{
+      const o=document.createElement('option');o.value=c.id;o.textContent=c.nome;selC.appendChild(o);
+    });
+  }
+  loadAusencias();
+}
+
+function getDiasUteis(ano,mes){
+  const dias=[];
+  const ultimoDia=new Date(ano,mes,0).getDate();
+  for(let d=1;d<=ultimoDia;d++){
+    const date=new Date(ano,mes-1,d);
+    const dow=date.getDay();
+    if(dow!==0&&dow!==6)dias.push(date.toISOString().split('T')[0]);
+  }
+  return dias;
+}
+
+async function loadAusencias(){
+  const mes=document.getElementById('ausMes')?.value||'';
+  const colabId=document.getElementById('ausColab')?.value||'';
+  if(!mes)return;
+  const[ano,m]=mes.split('-');
+  const inicio=mes+'-01';
+  const fim=new Date(parseInt(ano),parseInt(m),0).toISOString().split('T')[0];
+  const today=new Date().toISOString().split('T')[0];
+
+  let query=sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome');
+  if(colabId)query=sb.from('colaboradores').select('id,nome').eq('id',colabId);
+  const{data:colabs}=await query;
+  if(!colabs||!colabs.length)return;
+
+  const diasUteis=getDiasUteis(parseInt(ano),parseInt(m)).filter(d=>d<=today);
+
+  // Get all ponto records for this month
+  const{data:pontos}=await sb.from('ponto').select('colaborador_id,data,entrada,saida').gte('data',inicio).lte('data',fim);
+
+  let totalPresencas=0,totalFaltas=0,totalIncomp=0;
+  let rows='';
+
+  for(const c of colabs){
+    const meusPontos=(pontos||[]).filter(p=>p.colaborador_id===c.id);
+    const pontoDias=new Set(meusPontos.map(p=>p.data));
+    let presencas=0,faltas=0,incomp=0;
+    const detalhes=[];
+
+    diasUteis.forEach(dia=>{
+      if(pontoDias.has(dia)){
+        const reg=meusPontos.find(p=>p.data===dia);
+        if(reg&&reg.entrada&&reg.saida){presencas++;detalhes.push({dia,estado:'ok'});}
+        else{incomp++;detalhes.push({dia,estado:'incomp'});}
+      } else {
+        faltas++;detalhes.push({dia,estado:'falta'});
+      }
+    });
+
+    totalPresencas+=presencas;totalFaltas+=faltas;totalIncomp+=incomp;
+    const total=presencas+faltas+incomp||1;
+    const pct=Math.round((presencas/total)*100);
+    const cor=pct>=90?'#3B6D11':pct>=75?'#BA7517':'#E24B4A';
+    const barW=pct+'%';
+
+    const detHtml=detalhes.map(d=>{
+      if(d.estado==='ok')return `<span style="background:#EAF3DE;color:#3B6D11;padding:3px 8px;border-radius:6px;font-size:11px">${d.dia.split('-').reverse().slice(0,2).join('/')} ✓</span>`;
+      if(d.estado==='incomp')return `<span style="background:#FAEEDA;color:#854F0B;padding:3px 8px;border-radius:6px;font-size:11px">${d.dia.split('-').reverse().slice(0,2).join('/')} ⚠️</span>`;
+      return `<span style="background:#FCEBEB;color:#A32D2D;padding:3px 8px;border-radius:6px;font-size:11px">${d.dia.split('-').reverse().slice(0,2).join('/')} ✗</span>`;
+    }).join('');
+
+    const rid='aus_'+c.id.replace(/-/g,'');
+    rows+=`<tr>
+      <td><strong>${c.nome}</strong></td>
+      <td style="text-align:center;color:#3B6D11;font-weight:500">${presencas}</td>
+      <td style="text-align:center;color:#E24B4A;font-weight:500">${faltas}</td>
+      <td style="text-align:center;color:#BA7517;font-weight:500">${incomp}</td>
+      <td style="text-align:center;min-width:100px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;background:#f0ede6;border-radius:4px;height:6px"><div style="background:${cor};border-radius:4px;height:6px;width:${barW}"></div></div>
+          <span style="font-size:12px;color:${cor};font-weight:500">${pct}%</span>
+        </div>
+      </td>
+      <td style="text-align:center">
+        <button onclick="toggleAusDetalhe('${rid}')" style="font-size:12px;padding:4px 10px;border-radius:6px;border:0.5px solid #d4d2ca;cursor:pointer">Ver dias</button>
+      </td>
+    </tr>
+    <tr id="${rid}" style="display:none;background:var(--blu)">
+      <td colspan="6" style="padding:10px 14px"><div style="display:flex;flex-wrap:wrap;gap:6px">${detHtml}</div></td>
+    </tr>`;
+  }
+
+  document.getElementById('ausStats').innerHTML=`
+    <div style="background:var(--blu);border-radius:8px;padding:1rem"><div style="font-size:12px;color:var(--text2)">Dias úteis</div><div style="font-size:22px;font-weight:600;color:var(--blue)">${diasUteis.length}</div></div>
+    <div style="background:#EAF3DE;border-radius:8px;padding:1rem"><div style="font-size:12px;color:#3B6D11">Presenças</div><div style="font-size:22px;font-weight:600;color:#3B6D11">${totalPresencas}</div></div>
+    <div style="background:#FCEBEB;border-radius:8px;padding:1rem"><div style="font-size:12px;color:#A32D2D">Faltas</div><div style="font-size:22px;font-weight:600;color:#E24B4A">${totalFaltas}</div></div>
+    <div style="background:#FAEEDA;border-radius:8px;padding:1rem"><div style="font-size:12px;color:#854F0B">Incompletos</div><div style="font-size:22px;font-weight:600;color:#BA7517">${totalIncomp}</div></div>`;
+
+  document.getElementById('ausTabela').innerHTML=`<table><thead><tr>
+    <th>Colaborador</th><th>Presenças</th><th>Faltas</th><th>Incompletos</th><th>% Presença</th><th>Detalhe</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function toggleAusDetalhe(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.style.display=el.style.display==='none'?'table-row':'none';
+}
+
+
+// ─────────────────────────────────────────────────────
+// DASHBOARD ADM MELHORADO
+// ─────────────────────────────────────────────────────
+async function loadDashAdm(){
+  if(!cu||!cu.is_admin)return;
+  const now=new Date();
+  const mesAtual=now.getFullYear()+'-'+(String(now.getMonth()+1).padStart(2,'0'));
+  const inicio=mesAtual+'-01';
+  const fim=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  const hoje=now.toISOString().split('T')[0];
+
+  // Fetch all data in parallel
+  const[
+    {count:totalColabs},
+    {count:pendentes},
+    {count:recibosNaoAssinados},
+    {data:episData},
+    {data:fichasData},
+    {count:registosHoje}
+  ]=await Promise.all([
+    sb.from('colaboradores').select('*',{count:'exact',head:true}).eq('ativo',true),
+    sb.from('colaboradores').select('*',{count:'exact',head:true}).eq('ficha_pendente',true),
+    sb.from('recibos').select('*',{count:'exact',head:true}).eq('assinado',false),
+    sb.from('epis').select('proximo_renovacao').lte('proximo_renovacao',hoje),
+    sb.from('fichas').select('validade_doc').not('validade_doc','is',null),
+    sb.from('ponto').select('*',{count:'exact',head:true}).eq('data',hoje)
+  ]);
+
+  // Count docs expiring in 90 days
+  const em90=new Date();em90.setDate(em90.getDate()+90);
+  const docsExpirando=(fichasData||[]).filter(f=>{
+    if(!f.validade_doc)return false;
+    const v=new Date(f.validade_doc);
+    return v<=em90&&v>=now;
+  }).length;
+
+  const episRenovar=(episData||[]).length;
+
+  const dashEl=document.getElementById('dashContent');
+  if(!dashEl)return;
+
+  dashEl.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:1.5rem">
+      <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:1rem;cursor:pointer" onclick="showP('acolab')">
+        <div style="font-size:12px;color:var(--text2)">Colaboradores ativos</div>
+        <div style="font-size:28px;font-weight:600;color:#152B55">${totalColabs||0}</div>
+      </div>
+      <div style="background:${pendentes?'#FAEEDA':'#EAF3DE'};border-radius:12px;padding:1rem;cursor:pointer" onclick="showP('acolab')">
+        <div style="font-size:12px;color:${pendentes?'#854F0B':'#3B6D11'}">Fichas pendentes</div>
+        <div style="font-size:28px;font-weight:600;color:${pendentes?'#BA7517':'#3B6D11'}">${pendentes||0}</div>
+      </div>
+      <div style="background:${recibosNaoAssinados?'#FCEBEB':'#EAF3DE'};border-radius:12px;padding:1rem;cursor:pointer" onclick="showP('assinaturas')">
+        <div style="font-size:12px;color:${recibosNaoAssinados?'#A32D2D':'#3B6D11'}">Recibos p/ assinar</div>
+        <div style="font-size:28px;font-weight:600;color:${recibosNaoAssinados?'#E24B4A':'#3B6D11'}">${recibosNaoAssinados||0}</div>
+      </div>
+      <div style="background:${episRenovar?'#FCEBEB':'#EAF3DE'};border-radius:12px;padding:1rem;cursor:pointer" onclick="showP('epis')">
+        <div style="font-size:12px;color:${episRenovar?'#A32D2D':'#3B6D11'}">EPIs a renovar</div>
+        <div style="font-size:28px;font-weight:600;color:${episRenovar?'#E24B4A':'#3B6D11'}">${episRenovar||0}</div>
+      </div>
+      <div style="background:${docsExpirando?'#FAEEDA':'#EAF3DE'};border-radius:12px;padding:1rem;cursor:pointer" onclick="showP('alertas')">
+        <div style="font-size:12px;color:${docsExpirando?'#854F0B':'#3B6D11'}">Docs a expirar</div>
+        <div style="font-size:28px;font-weight:600;color:${docsExpirando?'#BA7517':'#3B6D11'}">${docsExpirando||0}</div>
+      </div>
+      <div style="background:#EAF3DE;border-radius:12px;padding:1rem;cursor:pointer" onclick="showP('apontos')">
+        <div style="font-size:12px;color:#3B6D11">Registos hoje</div>
+        <div style="font-size:28px;font-weight:600;color:#3B6D11">${registosHoje||0}</div>
+      </div>
+    </div>`;
+}
