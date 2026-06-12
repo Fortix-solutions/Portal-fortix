@@ -106,6 +106,7 @@ function showP(page){
   if(page==='meusepis')loadMeusEPIs();
   if(page==='meusdocs')loadMeusDocs();
   if(page==='ausencias')initAusencias();
+  if(page==='dashadm')loadDashAdm();
 }
 
 async function loadDashboard(){
@@ -119,7 +120,7 @@ async function loadDashboard(){
       dashBtn.className='ni';
       dashBtn.style.cssText='cursor:pointer;font-weight:500';
       dashBtn.innerHTML='<i class="ti ti-layout-dashboard"></i> <span class="ni-text">Dashboard ADM</span>';
-      dashBtn.onclick=function(){showP('dash');};
+      dashBtn.onclick=function(){showP('dashadm');};
       admNav.insertBefore(dashBtn,admNav.firstChild);
     }
     const{count:tc}=await sb.from('colaboradores').select('*',{count:'exact',head:true}).eq('ativo',true);
@@ -1812,7 +1813,7 @@ async function loadDashAdm(){
 
   const episRenovar=(episData||[]).length;
 
-  const dashEl=document.getElementById('dashContent');
+  const dashEl=document.getElementById('dashAdmContent')||document.getElementById('dashContent');
   if(!dashEl)return;
 
   dashEl.innerHTML=`
