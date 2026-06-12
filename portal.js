@@ -1362,13 +1362,22 @@ async function loadMeusDocs(){
 async function uploadDocColab(tipo, inputId){
   if(!inputId)inputId=tipo==='identificacao'?'uploadDocId':'uploadDocIban';
   const file=document.getElementById(inputId)?.files[0];
-  if(!file){alert('Selecione um ficheiro.');return;}
-  if(file.size>10*1024*1024){alert('Ficheiro demasiado grande. Máx. 10MB.');return;}
+  if(!file){toast('Selecione um ficheiro primeiro.','erro');return;}
+  if(file.size>10*1024*1024){toast('Ficheiro demasiado grande. Máx. 10MB.','erro');return;}
   if(!cu)return;
+
+  // Disable button to prevent double click
+  const btn=document.querySelector(`button[onclick*="${inputId}"]`);
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2"></i> A carregar...';}
+
   const ext=file.name.split('.').pop();
   const path=`docs-ficha/${cu.id}/${tipo}-${Date.now()}.${ext}`;
   const{error:upErr}=await sb.storage.from('Documentos').upload(path,file,{upsert:true});
-  if(upErr){alert('Erro ao carregar: '+upErr.message);return;}
+  if(upErr){
+    toast('Erro ao carregar: '+upErr.message,'erro');
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-upload"></i> Carregar';}
+    return;
+  }
   const{data:urlData}=sb.storage.from('Documentos').getPublicUrl(path);
   await sb.from('documentos_ficha').insert({
     colaborador_id:cu.id,
