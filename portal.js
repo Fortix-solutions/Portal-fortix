@@ -38,6 +38,7 @@ function iniciarPortal(){
   if(cu.troca_senha)showModal('modalSenha');
   startClock();showP('dash');
   initNotificacoes();
+  initSessionTimer();
   // Add menu toggle button to sidebar
   const sbLogo=document.querySelector('.sb-logo');
   if(sbLogo&&!document.getElementById('sidebarToggleBtn')){
@@ -108,6 +109,7 @@ function showP(page){
   if(page==='meusdocs')loadMeusDocs();
   if(page==='ausencias')initAusencias();
   if(page==='dashadm')loadDashAdm();
+  if(page==='historico')initHistorico();
 }
 
 async function loadDashboard(){
@@ -530,8 +532,10 @@ async function guardarEditAdm(id){
     document.getElementById('ea_erro').textContent='Erro ao guardar: '+error.message;
     return;
   }
+  // Register in historico
+  const campos=Object.keys(payload).filter(k=>payload[k]!==null&&payload[k]!=='');
+  await registarHistorico(id,'profissional','Dados profissionais editados',campos);
   document.getElementById('modalEditAdm').remove();
-  // Refresh view
   verColab(id);
   toast('Dados profissionais atualizados!');
 }
@@ -1547,6 +1551,60 @@ function toggleSidebar(){
   }
 }
 
+
+// ─────────────────────────────────────────────────────
+// SESSÃO - EXPIRAR AUTOMATICAMENTE
+// ─────────────────────────────────────────────────────
+let sessionTimer=null, warningTimer=null;
+const SESSION_TIMEOUT=30*60*1000; // 30 min
+const WARNING_TIME=2*60*1000; // 2 min before
+
+function resetSessionTimer(){
+  clearTimeout(sessionTimer);
+  clearTimeout(warningTimer);
+  const warning=document.getElementById('sessionWarning');
+  if(warning)warning.style.display='none';
+  warningTimer=setTimeout(showSessionWarning, SESSION_TIMEOUT-WARNING_TIME);
+  sessionTimer=setTimeout(()=>{ doLogout(); }, SESSION_TIMEOUT);
+}
+
+function showSessionWarning(){
+  let secs=120;
+  let modal=document.getElementById('sessionWarning');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='sessionWarning';
+    modal.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+    modal.innerHTML=`
+      <div style="background:#fff;border-radius:16px;padding:2rem;max-width:320px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+        <div style="width:48px;height:48px;border-radius:50%;background:#FAEEDA;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem">
+          <i class="ti ti-clock" style="font-size:24px;color:#BA7517"></i>
+        </div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">Sessão prestes a expirar</div>
+        <div style="font-size:13px;color:#666;margin-bottom:1.5rem">A sua sessão expira em <strong id="sessionCountdown">2:00</strong>. Deseja continuar?</div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button onclick="doLogout()" style="padding:9px 20px;border-radius:8px;border:1px solid #d4d2ca;background:#fff;cursor:pointer;font-size:13px">Sair</button>
+          <button onclick="resetSessionTimer()" style="padding:9px 20px;border-radius:8px;border:none;background:#152B55;color:#fff;cursor:pointer;font-size:13px;font-weight:500">Continuar sessão</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.style.display='flex';
+  const cdEl=document.getElementById('sessionCountdown');
+  const cdInt=setInterval(()=>{
+    secs--;
+    if(secs<=0){clearInterval(cdInt);return;}
+    if(cdEl)cdEl.textContent=Math.floor(secs/60)+':'+(secs%60).toString().padStart(2,'0');
+  },1000);
+}
+
+function initSessionTimer(){
+  ['click','keypress','mousemove','touchstart'].forEach(e=>{
+    document.addEventListener(e, resetSessionTimer, {passive:true});
+  });
+  resetSessionTimer();
+}
+
 // ─────────────────────────────────────────────────────
 // NOTIFICAÇÕES
 // ─────────────────────────────────────────────────────
@@ -1878,4 +1936,224 @@ function toggleDashPanel(id){
   el.style.display=el.style.display==='none'?'block':'none';
 }
 
+
+
+// ─────────────────────────────────────────────────────
+// EXPORTAR RELATÓRIOS - PDF E EXCEL
+// ─────────────────────────────────────────────────────
+function exportarRelatorioExcel(dados, nomeFile){
+  if(!dados||!dados.length){toast('Sem dados para exportar','erro');return;}
+  const headers=Object.keys(dados[0]);
+  const rows=[headers,...dados.map(r=>headers.map(h=>r[h]||''))];
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const bom='\uFEFF';
+  const blob=new Blob([bom+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=nomeFile+'.csv';
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast('✅ Ficheiro exportado!');
+}
+
+function exportarRelatorioPDF(titulo, headers, rows){
+  const win=window.open('','_blank');
+  const agora=new Date().toLocaleDateString('pt-PT');
+  const tableRows=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>${titulo}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#1a1a18}
+      h1{font-size:18px;color:#152B55;margin-bottom:4px}
+      .sub{font-size:12px;color:#888;margin-bottom:20px}
+      table{width:100%;border-collapse:collapse;margin-top:10px}
+      th{background:#152B55;color:#fff;padding:8px 10px;text-align:left;font-weight:500}
+      td{padding:8px 10px;border-bottom:1px solid #e8e6df}
+      tr:nth-child(even) td{background:#f9f8f5}
+      .footer{margin-top:20px;font-size:11px;color:#888;text-align:right}
+    </style>
+  </head><body>
+    <h1>${titulo}</h1>
+    <div class="sub">Fortix Solutions, Lda. &nbsp;|&nbsp; Gerado em ${agora}</div>
+    <table>
+      <thead><tr>${headers.map(h=>'<th>'+h+'</th>').join('')}</tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    <div class="footer">Fortix Solutions · geral@fortix.pt</div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),500);
+}
+
+async function exportarRelatorioHorasPDF(){
+  const mes=document.getElementById('relMes')?.value||'';
+  const colabId=document.getElementById('relColab')?.value||'';
+  if(!mes){toast('Selecione um mês','erro');return;}
+  const[ano,m]=mes.split('-');
+  const inicio=mes+'-01';
+  const fim=new Date(parseInt(ano),parseInt(m),0).toISOString().split('T')[0];
+  let query=sb.from('ponto').select('*,colaboradores(nome)').gte('data',inicio).lte('data',fim);
+  if(colabId)query=query.eq('colaborador_id',colabId);
+  const{data}=await query;
+  if(!data||!data.length){toast('Sem dados','erro');return;}
+  const map={};
+  data.forEach(r=>{
+    const nome=r.colaboradores?.nome||'—';
+    if(!map[nome])map[nome]={nome,dias:0,horas:0};
+    map[nome].dias++;
+    map[nome].horas+=(parseFloat(r.total_horas)||0);
+  });
+  const mesLabel=new Date(parseInt(ano),parseInt(m)-1,1).toLocaleDateString('pt-PT',{month:'long',year:'numeric'});
+  const rows=Object.values(map).map(v=>[v.nome,v.dias,v.horas.toFixed(1)+'h',(v.horas/v.dias).toFixed(1)+'h']);
+  exportarRelatorioPDF('Relatório de horas — '+mesLabel,['Colaborador','Dias','Total horas','Média/dia'],rows);
+}
+
+async function exportarRelatorioHorasExcel(){
+  const mes=document.getElementById('relMes')?.value||'';
+  const colabId=document.getElementById('relColab')?.value||'';
+  if(!mes){toast('Selecione um mês','erro');return;}
+  const[ano,m]=mes.split('-');
+  const inicio=mes+'-01';
+  const fim=new Date(parseInt(ano),parseInt(m),0).toISOString().split('T')[0];
+  let query=sb.from('ponto').select('*,colaboradores(nome)').gte('data',inicio).lte('data',fim).order('data',{ascending:true});
+  if(colabId)query=query.eq('colaborador_id',colabId);
+  const{data}=await query;
+  if(!data||!data.length){toast('Sem dados','erro');return;}
+  const rows=data.map(r=>({'Colaborador':r.colaboradores?.nome||'—','Data':r.data,'Entrada':r.entrada||'','Início pausa':r.inicio_pausa||'','Fim pausa':r.fim_pausa||'','Saída':r.saida||'','Total horas':r.total_horas||''}));
+  const mesLabel=new Date(parseInt(ano),parseInt(m)-1,1).toLocaleDateString('pt-PT',{month:'long',year:'numeric'});
+  exportarRelatorioExcel(rows,'Relatorio_Horas_'+mesLabel.replace(' ','_'));
+}
+
+async function exportarAusenciasPDF(){
+  const mes=document.getElementById('ausMes')?.value||'';
+  if(!mes){toast('Selecione um mês','erro');return;}
+  const[ano,m]=mes.split('-');
+  const hoje=new Date().toISOString().split('T')[0];
+  const inicio=mes+'-01';
+  const fim=new Date(parseInt(ano),parseInt(m),0).toISOString().split('T')[0];
+  const diasUteis=getDiasUteis(parseInt(ano),parseInt(m)).filter(d=>d<=hoje);
+  const{data:colabs}=await sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome');
+  const{data:pontos}=await sb.from('ponto').select('colaborador_id,data,entrada,saida').gte('data',inicio).lte('data',fim);
+  const rows=(colabs||[]).map(c=>{
+    const meusPontos=(pontos||[]).filter(p=>p.colaborador_id===c.id);
+    const pontoDias=new Set(meusPontos.map(p=>p.data));
+    let presencas=0,faltas=0,incomp=0;
+    diasUteis.forEach(dia=>{
+      if(pontoDias.has(dia)){
+        const reg=meusPontos.find(p=>p.data===dia);
+        if(reg&&reg.entrada&&reg.saida)presencas++;
+        else incomp++;
+      } else faltas++;
+    });
+    const pct=Math.round((presencas/(diasUteis.length||1))*100);
+    return [c.nome,diasUteis.length,presencas,faltas,incomp,pct+'%'];
+  });
+  const mesLabel=new Date(parseInt(ano),parseInt(m)-1,1).toLocaleDateString('pt-PT',{month:'long',year:'numeric'});
+  exportarRelatorioPDF('Relatório de ausências — '+mesLabel,['Colaborador','Dias úteis','Presenças','Faltas','Incompletos','% Presença'],rows);
+}
+
+async function exportarAusenciasExcel(){
+  const mes=document.getElementById('ausMes')?.value||'';
+  if(!mes){toast('Selecione um mês','erro');return;}
+  const[ano,m]=mes.split('-');
+  const hoje=new Date().toISOString().split('T')[0];
+  const inicio=mes+'-01';
+  const fim=new Date(parseInt(ano),parseInt(m),0).toISOString().split('T')[0];
+  const diasUteis=getDiasUteis(parseInt(ano),parseInt(m)).filter(d=>d<=hoje);
+  const{data:colabs}=await sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome');
+  const{data:pontos}=await sb.from('ponto').select('colaborador_id,data,entrada,saida').gte('data',inicio).lte('data',fim);
+  const rows=(colabs||[]).map(c=>{
+    const meusPontos=(pontos||[]).filter(p=>p.colaborador_id===c.id);
+    const pontoDias=new Set(meusPontos.map(p=>p.data));
+    let presencas=0,faltas=0,incomp=0;
+    diasUteis.forEach(dia=>{
+      if(pontoDias.has(dia)){const reg=meusPontos.find(p=>p.data===dia);if(reg&&reg.entrada&&reg.saida)presencas++;else incomp++;}
+      else faltas++;
+    });
+    const pct=Math.round((presencas/(diasUteis.length||1))*100);
+    return{'Colaborador':c.nome,'Dias úteis':diasUteis.length,'Presenças':presencas,'Faltas':faltas,'Incompletos':incomp,'% Presença':pct+'%'};
+  });
+  const mesLabel=new Date(parseInt(ano),parseInt(m)-1,1).toLocaleDateString('pt-PT',{month:'long',year:'numeric'});
+  exportarRelatorioExcel(rows,'Ausencias_'+mesLabel.replace(' ','_'));
+}
+
+async function exportarPontosPDF(){
+  const{data}=await sb.from('ponto').select('*,colaboradores(nome)').order('data',{ascending:false}).limit(200);
+  if(!data||!data.length){toast('Sem dados','erro');return;}
+  const rows=data.map(r=>[r.colaboradores?.nome||'—',r.data,r.entrada||'',r.saida||'',r.total_horas||'']);
+  exportarRelatorioPDF('Relatório de ponto',['Colaborador','Data','Entrada','Saída','Total horas'],rows);
+}
+
+async function exportarPontosExcel(){
+  const{data}=await sb.from('ponto').select('*,colaboradores(nome)').order('data',{ascending:false}).limit(500);
+  if(!data||!data.length){toast('Sem dados','erro');return;}
+  const rows=data.map(r=>({'Colaborador':r.colaboradores?.nome||'—','Data':r.data,'Entrada':r.entrada||'','Início pausa':r.inicio_pausa||'','Fim pausa':r.fim_pausa||'','Saída':r.saida||'','Total horas':r.total_horas||''}));
+  exportarRelatorioExcel(rows,'Relatorio_Ponto');
+}
+
+// ─────────────────────────────────────────────────────
+// HISTÓRICO DE ALTERAÇÕES
+// ─────────────────────────────────────────────────────
+async function registarHistorico(colaboradorId, tipo, descricao, campos){
+  try{
+    await sb.from('historico_alteracoes').insert({
+      colaborador_id:colaboradorId,
+      tipo,
+      descricao,
+      campos:campos?JSON.stringify(campos):null,
+      feito_por:cu?.nome||'—',
+      criado_em:new Date().toISOString()
+    });
+  }catch(e){}
+}
+
+async function loadHistorico(){
+  const colabId=document.getElementById('histFilterColab')?.value||'';
+  const el=document.getElementById('histContent');
+  if(!el)return;
+  let query=sb.from('historico_alteracoes').select('*,colaboradores(nome)').order('criado_em',{ascending:false}).limit(50);
+  if(colabId)query=query.eq('colaborador_id',colabId);
+  const{data}=await query;
+  if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:2rem">Sem registos de alterações</p>';return;}
+  const icons={ficha:'ti-pencil',profissional:'ti-briefcase',epi:'ti-shield-check',documento:'ti-upload',colaborador:'ti-user-plus',recibo:'ti-file-invoice'};
+  const cores={ficha:'#EAF3DE,#3B6D11',profissional:'#FAEEDA,#BA7517',epi:'#E6F1FB,#185FA5',documento:'#FCEBEB,#E24B4A',colaborador:'#EAF3DE,#3B6D11',recibo:'#E6F1FB,#185FA5'};
+  let html='<div style="display:flex;flex-direction:column">';
+  data.forEach((h,i)=>{
+    const nome=h.colaboradores?.nome||'—';
+    const icon=icons[h.tipo]||'ti-history';
+    const[bg,fc]=(cores[h.tipo]||'#f9f8f5,#555').split(',');
+    const campos=h.campos?JSON.parse(h.campos):[];
+    const camposHTML=Array.isArray(campos)&&campos.length?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'+campos.map(c=>`<span style="background:${bg};color:${fc};padding:2px 8px;border-radius:6px;font-size:11px">${c}</span>`).join('')+'</div>':'';
+    const data_hora=new Date(h.criado_em).toLocaleDateString('pt-PT')+' · '+new Date(h.criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+    html+=`<div style="display:flex;gap:14px;padding:12px 0;border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;flex-direction:column;align-items:center;min-width:36px">
+        <div style="width:32px;height:32px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="ti ${icon}" style="font-size:15px;color:${fc}"></i>
+        </div>
+        ${i<data.length-1?'<div style="width:1px;flex:1;background:var(--border);margin-top:4px"></div>':''}
+      </div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${h.descricao||'—'}</div>
+          <span style="font-size:11px;color:var(--text2)">${data_hora}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">Colaborador: <strong>${nome}</strong> · Por: ${h.feito_por||'—'}</div>
+        ${camposHTML}
+      </div>
+    </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+async function initHistorico(){
+  const sel=document.getElementById('histFilterColab');
+  if(sel&&sel.options.length<=1){
+    const{data:colabs}=await sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome');
+    if(colabs)colabs.forEach(c=>{
+      const o=document.createElement('option');o.value=c.id;o.textContent=c.nome;sel.appendChild(o);
+    });
+  }
+  loadHistorico();
+}
 
