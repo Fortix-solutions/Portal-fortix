@@ -116,6 +116,20 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
 .notif-item.unread { background: #F0F7FF; }
 .notif-item:hover { background: var(--blu); }
 </style>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCToG7rQr04ba0_kuHBe0ms2xqlS5oujfk",
+      authDomain: "fortix-portal.firebaseapp.com",
+      projectId: "fortix-portal",
+      storageBucket: "fortix-portal.firebasestorage.app",
+      messagingSenderId: "258742162227",
+      appId: "1:258742162227:web:160ae7fd65e3b0a2d3a446"
+    };
+    firebase.initializeApp(firebaseConfig);
+  </script>
 </head>
 <body>
 
