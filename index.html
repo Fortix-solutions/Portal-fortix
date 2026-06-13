@@ -187,6 +187,7 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
         <div class="ni" id="n-ausencias" onclick="showP('ausencias')"><i class="ti ti-calendar-off"></i> <span class="ni-text">Ausências</span></div>
         <div class="ni" id="n-epis" onclick="showP('epis')"><i class="ti ti-shield-check"></i> <span class="ni-text">Gestão EPIs</span></div>
         <div class="ni" id="n-alertas" onclick="showP('alertas')"><i class="ti ti-bell"></i> <span class="ni-text">Alertas docs</span></div>
+        <div class="ni" id="n-historico" onclick="showP('historico')"><i class="ti ti-history"></i> <span class="ni-text">Histórico</span></div>
       </div>
     </div>
 
@@ -373,8 +374,12 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
     </div>
 
     <div id="p-apontos" class="hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
         <div class="pt">Relatório de ponto</div>
+        <div style="display:flex;gap:6px">
+          <button onclick="exportarPontosPDF()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:0.5px solid #F09595;background:#FCEBEB;color:#A32D2D;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf"></i> PDF</button>
+          <button onclick="exportarPontosExcel()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:0.5px solid #C0DD97;background:#EAF3DE;color:#3B6D11;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-file-type-xls"></i> Excel</button>
+        </div>
         <button class="bs bb" onclick="exportarPontoExcel()" style="display:flex;align-items:center;gap:6px"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
       </div>
       <div class="ps">Todos os registos de todos os colaboradores</div>
@@ -412,6 +417,16 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
       </div>
     </div>
 
+    <div id="p-historico" class="hidden">
+      <div class="pt">Histórico de alterações</div>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+        <select id="histFilterColab" onchange="loadHistorico()" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #d4d2ca">
+          <option value="">Todos os colaboradores</option>
+        </select>
+      </div>
+      <div id="histContent"></div>
+    </div>
+
     <div id="p-dashadm" class="hidden">
       <div class="pt">Dashboard ADM</div>
       <div id="dashAdmContent"></div>
@@ -419,9 +434,11 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
 
     <div id="p-ausencias" class="hidden">
       <div class="pt">Relatório de ausências</div>
-      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
         <select id="ausMes" onchange="loadAusencias()" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #d4d2ca"></select>
         <select id="ausColab" onchange="loadAusencias()" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #d4d2ca"><option value="">Todos os colaboradores</option></select>
+        <button onclick="exportarAusenciasPDF()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:0.5px solid #F09595;background:#FCEBEB;color:#A32D2D;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf"></i> PDF</button>
+        <button onclick="exportarAusenciasExcel()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:0.5px solid #C0DD97;background:#EAF3DE;color:#3B6D11;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-file-type-xls"></i> Excel</button>
       </div>
       <div id="ausStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:1rem"></div>
       <div id="ausTabela"></div>
@@ -429,9 +446,11 @@ canvas{border:1px solid var(--border);border-radius:8px;cursor:crosshair;display
 
     <div id="p-relatorio" class="hidden">
       <div class="pt">Relatório mensal de horas</div>
-      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
         <select id="relMes" onchange="loadRelatorio()" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #d4d2ca"></select>
         <select id="relColab" onchange="loadRelatorio()" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #d4d2ca"><option value="">Todos os colaboradores</option></select>
+        <button onclick="exportarRelatorioHorasPDF()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:0.5px solid #F09595;background:#FCEBEB;color:#A32D2D;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf"></i> PDF</button>
+        <button onclick="exportarRelatorioHorasExcel()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:0.5px solid #C0DD97;background:#EAF3DE;color:#3B6D11;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-file-type-xls"></i> Excel</button>
       </div>
       <div id="relStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1rem"></div>
       <div id="relTabela"></div>
