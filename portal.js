@@ -22,9 +22,47 @@ async function doLogin(){
   const err=document.getElementById('lErr');
   err.style.display='none';
   if(!nif||!pwd){err.textContent='Preencha NIF e senha.';err.style.display='block';return;}
-  const{data,error}=await sb.from('colaboradores').select('*').eq('nif',nif).eq('senha',pwd).eq('ativo',true).maybeSingle();
+  // Try active first
+  let{data,error}=await sb.from('colaboradores').select('*').eq('nif',nif).eq('senha',pwd).eq('ativo',true).maybeSingle();
+  
+  // If not active, check if deactivated (show limited access)
+  if(!data){
+    const{data:inativo}=await sb.from('colaboradores').select('*').eq('nif',nif).eq('senha',pwd).eq('ativo',false).maybeSingle();
+    if(inativo){
+      err.textContent='O seu acesso ao portal foi encerrado. Apenas pode ver os seus recibos e contrato. Contacte a administração.';
+      err.style.display='block';
+      err.style.color='#BA7517';
+      inativo._acessoLimitado=true;
+      cu=inativo;
+      iniciarPortalLimitado();
+      return;
+    }
+  }
+  
   if(error||!data){err.style.display='block';return;}
   cu=data;localStorage.setItem('fx_user',JSON.stringify(data));iniciarPortal();
+}
+
+function iniciarPortalLimitado(){
+  // Show only recibos and contrato
+  document.getElementById('loginBox').classList.add('hidden');
+  document.getElementById('appBox').classList.remove('hidden');
+  document.getElementById('sbName').textContent=cu.nome||'—';
+  document.getElementById('sbRole').textContent='Acesso limitado';
+  document.getElementById('admNav')?.classList.add('hidden');
+  // Hide all menu items except recibos and docs
+  ['n-dash','n-ponto','n-ficha','n-meusdocs','n-meusepis'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  });
+  showP('recibos');
+  // Show warning banner
+  const main=document.querySelector('.mn');
+  if(main){
+    const banner=document.createElement('div');
+    banner.style.cssText='background:#FAEEDA;border:1px solid #E8C97A;border-radius:10px;padding:12px 16px;font-size:13px;color:#854F0B;margin-bottom:1rem;display:flex;align-items:center;gap:8px';
+    banner.innerHTML='<i class="ti ti-alert-triangle"></i> A sua conta foi desativada. Pode ainda consultar os seus recibos e contrato. Contacte a administração para mais informações.';
+    main.insertBefore(banner,main.firstChild);
+  }
 }
 
 function iniciarPortal(){
@@ -281,7 +319,14 @@ async function saveSig(){
 }
 
 async function loadDocs(){
-  const{data}=await sb.from('documentos').select('*').order('criado_em',{ascending:false});
+  const{data:allDocs}=await sb.from('documentos').select('*').order('criado_em',{ascending:false});
+  const data=(allDocs||[]).filter(d=>{
+    if(!d.visibilidade||d.visibilidade==='todos')return true;
+    if(d.visibilidade==='especifico'&&d.colaboradores_ids){
+      return d.colaboradores_ids.split(',').includes(cu.id);
+    }
+    return false;
+  });
   const el=document.getElementById('docsGrid');
   if(!data||!data.length){
     el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem;grid-column:1/-1">Sem documentos</p>';
@@ -657,6 +702,27 @@ async function carregarRecibo(){
   setTimeout(()=>{msg.textContent='';},3000);
 }
 
+function toggleDocVis(){
+  const esp=document.getElementById('docVisEsp');
+  const sel=document.getElementById('docColabSelect');
+  const lista=document.getElementById('docColabLista');
+  if(esp&&esp.checked){
+    if(sel)sel.style.display='block';
+    // Load colaboradores
+    if(lista&&lista.children.length===0){
+      sb.from('colaboradores').select('id,nome').eq('ativo',true).order('nome').then(({data})=>{
+        if(data)lista.innerHTML=data.map(c=>`
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:0.5px solid #f0ede6;cursor:pointer">
+            <input type="checkbox" class="doc-colab-check" value="${c.id}" style="width:15px;height:15px" />
+            <span style="font-size:13px">${c.nome}</span>
+          </label>`).join('');
+      });
+    }
+  } else {
+    if(sel)sel.style.display='none';
+  }
+}
+
 async function publicarDoc(){
   const titulo=document.getElementById('aDTit').value.trim();
   const desc=document.getElementById('aDDesc').value.trim();
@@ -678,7 +744,16 @@ async function publicarDoc(){
   } else {
     msg.style.color='var(--red)';msg.textContent='Selecione um PDF ou introduza um link.';return;
   }
-  const{error}=await sb.from('documentos').insert({titulo,descricao:desc,ficheiro_url});
+  // Get visibility setting
+  const visAll=document.getElementById('docVisAll');
+  const visEsp=document.getElementById('docVisEsp');
+  const visibilidade=visEsp&&visEsp.checked?'especifico':'todos';
+  let colaboradores_ids=null;
+  if(visibilidade==='especifico'){
+    const checkboxes=document.querySelectorAll('.doc-colab-check:checked');
+    colaboradores_ids=Array.from(checkboxes).map(c=>c.value).join(',');
+  }
+  const{error}=await sb.from('documentos').insert({titulo,descricao:desc,ficheiro_url,visibilidade,colaboradores_ids});
   if(error){msg.style.color='var(--red)';msg.textContent='Erro: '+error.message;return;}
   msg.style.color='var(--green)';msg.textContent='✅ Documento publicado!';
   document.getElementById('aDTit').value='';
@@ -913,8 +988,30 @@ async function excluirColab(id, nome){
 
 async function toggleAtivo(id, ativo){
   const acao = ativo ? 'reativar' : 'desativar';
-  if(!confirm('Tem a certeza que deseja '+acao+' este colaborador?')) return;
-  await sb.from('colaboradores').update({ativo}).eq('id',id);
+  if(!confirm('Tem a certeza que deseja '+acao+' este colaborador?'+(ativo?'':' \n\nSerá enviado um email com aviso de 3 dias para fazer backup dos documentos.'))) return;
+  
+  if(!ativo){
+    // Reactivate
+    await sb.from('colaboradores').update({ativo:true}).eq('id',id);
+    toast('Colaborador reativado!');
+  } else {
+    // Deactivate - send backup warning email
+    const{data:colab}=await sb.from('colaboradores').select('nome,email').eq('id',id).maybeSingle();
+    const dataLimite=new Date();dataLimite.setDate(dataLimite.getDate()+3);
+    const prazoStr=dataLimite.toLocaleDateString('pt-PT');
+    await sb.from('colaboradores').update({ativo:false}).eq('id',id);
+    if(colab&&colab.email){
+      emailjs.send(EJ_SERVICE,'template_ype66lh',{
+        name:colab.nome,
+        email:colab.email,
+        nome:colab.nome,
+        email_destino:colab.email,
+        assunto:'Aviso importante — Acesso ao portal Fortix',
+        mensagem:'Informamos que o seu acesso ao Portal Fortix foi encerrado.\n\nTem até '+prazoStr+' (3 dias) para aceder ao portal e fazer o download dos seus recibos e contrato de trabalho.\n\nApós esta data, o acesso será bloqueado definitivamente.\n\nFortix Solutions, Lda.'
+      }).catch(e=>{});
+    }
+    toast('Colaborador desativado — email de aviso enviado!');
+  }
   loadAColab();
 }
 
@@ -2346,13 +2443,13 @@ async function enviarPushColab(colaboradorId, titulo, corpo){
 async function loadAniversarios(){
   const el=document.getElementById('aniversariosContent');
   if(!el)return;
-  const{data:fichas}=await sb.from('fichas').select('colaborador_id,data_nasc,colaboradores(nome)');
+  const{data:fichas}=await sb.from('fichas').select('colaborador_id,data_nasc,colaboradores(nome,email,ativo)');
   if(!fichas||!fichas.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:2rem">Sem datas de nascimento registadas nas fichas</p>';return;}
 
   const hoje=new Date();
   const anoAtual=hoje.getFullYear();
 
-  const lista=fichas.filter(f=>f.data_nasc).map(f=>{
+  const lista=fichas.filter(f=>f.data_nasc&&f.colaboradores?.ativo).map(f=>{
     const nasc=new Date(f.data_nasc);
     const aniversario=new Date(anoAtual, nasc.getMonth(), nasc.getDate());
     if(aniversario<hoje) aniversario.setFullYear(anoAtual+1);
@@ -2360,6 +2457,7 @@ async function loadAniversarios(){
     const idade=anoAtual-nasc.getFullYear()+(diasAte>0?0:0);
     return{
       nome:f.colaboradores?.nome||'—',
+      email:f.colaboradores?.email||'',
       data_nasc:f.data_nasc,
       aniversario,
       diasAte,
@@ -2389,6 +2487,21 @@ async function loadAniversarios(){
   });
   html+='</div>';
   el.innerHTML=html;
+
+  // Send birthday email to colaboradores whose birthday is today
+  lista.filter(c=>c.diasAte===0).forEach(async c=>{
+    if(!c.email)return;
+    try{
+      await emailjs.send(EJ_SERVICE,'template_ype66lh',{
+        name:c.nome,
+        email:c.email,
+        nome:c.nome,
+        email_destino:c.email,
+        assunto:'🎂 Feliz Aniversário, '+c.nome.split(' ')[0]+'! — Fortix Solutions',
+        mensagem:'No seu dia especial, toda a equipa da Fortix Solutions deseja-lhe um feliz aniversário! Que este seja um dia incrível, repleto de alegria e momentos especiais. Um brinde a si! 🥂\n\nCom carinho,\nFortix Solutions, Lda.'
+      });
+    }catch(e){}
+  });
 
   // Update ADM bell badge if birthday in 3 days
   const proximos=lista.filter(c=>c.diasAte<=3).length;
