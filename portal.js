@@ -698,7 +698,8 @@ async function criarColab(){
 
 async function loadAPontos(){
   const colabId=document.getElementById('pontosFilterColab')?.value||'';
-  const dataFiltro=document.getElementById('pontosFilterData')?.value||'';
+  const dataInicio=document.getElementById('pontosDataInicio')?.value||'';
+  const dataFim=document.getElementById('pontosDataFim')?.value||'';
 
   // Populate filter if empty
   const sel=document.getElementById('pontosFilterColab');
@@ -709,9 +710,6 @@ async function loadAPontos(){
     });
   }
 
-  const dataInicio=document.getElementById('pontosDataInicio')?.value||'';
-  const dataFim=document.getElementById('pontosDataFim')?.value||'';
-
   let query=sb.from('ponto').select('*,colaboradores(nome)').order('data',{ascending:false}).limit(500);
   if(colabId)query=query.eq('colaborador_id',colabId);
   if(dataInicio)query=query.gte('data',dataInicio);
@@ -720,25 +718,119 @@ async function loadAPontos(){
   const el=document.getElementById('aPontosLista');
   if(!data||!data.length){el.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">Sem registos</p>';return;}
   pontosData=data;
+
   let rows='';
   data.forEach(function(r,i){
     const nome=r.colaboradores?r.colaboradores.nome:'—';
-    const total=r.total_horas?'<span class="badge bg2">'+r.total_horas+'</span>':'—';
-    rows+='<tr>';
-    rows+='<td>'+nome+'</td>';
-    rows+='<td>'+(r.data||'—')+'</td>';
-    rows+='<td>'+(r.entrada||'—')+'</td>';
-    rows+='<td>'+(r.inicio_pausa||'—')+'</td>';
-    rows+='<td>'+(r.fim_pausa||'—')+'</td>';
-    rows+='<td>'+(r.saida||'—')+'</td>';
-    rows+='<td>'+total+'</td>';
-    rows+='<td style="white-space:nowrap">';
-    rows+='<button class="bs bb" style="font-size:11px;padding:3px 8px;margin-right:3px" onclick="editarPontoIdx('+i+')">Editar</button>';
-    rows+='<button class="bs" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:#F09595" onclick="eliminarPontoIdx('+i+')">Eliminar</button>';
-    rows+='</td></tr>';
+    const h=parseFloat(r.total_horas)||0;
+    const tipo=getTipoDia(r.data);
+    const diaSem=getDiaSemana(r.data);
+    const calc=calcHorasExtras(h,tipo);
+    const dataFmt=r.data?r.data.split('-').reverse().join('/'):'—';
+    const pausa=r.inicio_pausa&&r.fim_pausa?r.inicio_pausa+'–'+r.fim_pausa:'—';
+
+    // Total badge color
+    let totalBadge='—';
+    if(h>0){
+      if(tipo==='sabado') totalBadge=`<span style="background:#FAEEDA;color:#854F0B;padding:3px 8px;border-radius:20px;font-weight:500">${h.toFixed(1)}h</span>`;
+      else if(tipo==='domingo'||tipo==='feriado') totalBadge=`<span style="background:#FCEBEB;color:#A32D2D;padding:3px 8px;border-radius:20px;font-weight:500">${h.toFixed(1)}h</span>`;
+      else if(h<8) totalBadge=`<span style="background:#FCEBEB;color:#A32D2D;padding:3px 8px;border-radius:20px;font-weight:500">${h.toFixed(1)}h</span>`;
+      else totalBadge=`<span style="background:#EAF3DE;color:#3B6D11;padding:3px 8px;border-radius:20px;font-weight:500">${h.toFixed(1)}h</span>`;
+    }
+
+    // Tipo label
+    let tipoLabel='';
+    if(tipo==='sabado') tipoLabel='<span style="background:#FAEEDA;color:#854F0B;padding:2px 6px;border-radius:6px;font-size:11px">Sáb 50%</span>';
+    else if(tipo==='domingo') tipoLabel='<span style="background:#FCEBEB;color:#A32D2D;padding:2px 6px;border-radius:6px;font-size:11px">Dom 100%</span>';
+    else if(tipo==='feriado') tipoLabel='<span style="background:#FCEBEB;color:#A32D2D;padding:2px 6px;border-radius:6px;font-size:11px">Fer 100%</span>';
+    else if(calc.falta>0) tipoLabel=`<span style="background:#FCEBEB;color:#A32D2D;padding:2px 6px;border-radius:6px;font-size:11px">-${calc.falta.toFixed(1)}h falta</span>`;
+    else{
+      let parts=[];
+      if(calc.extra25>0) parts.push(`+${calc.extra25.toFixed(1)}h 25%`);
+      if(calc.extra375>0) parts.push(`+${calc.extra375.toFixed(1)}h 37,5%`);
+      if(parts.length) tipoLabel=parts.map(p=>`<span style="background:#EAF3DE;color:#3B6D11;padding:2px 6px;border-radius:6px;font-size:11px">${p}</span>`).join(' ');
+      else if(h>0) tipoLabel='<span style="background:var(--blu);color:var(--blue);padding:2px 6px;border-radius:6px;font-size:11px">Normal</span>';
+    }
+
+    const diasemColor=tipo==='sabado'?'color:#BA7517;font-weight:500':tipo==='domingo'||tipo==='feriado'?'color:#E24B4A;font-weight:500':'color:var(--text2)';
+    const rowBg=tipo==='sabado'?'background:#FFFBF0':tipo==='domingo'||tipo==='feriado'?'background:#FFF5F5':h>0&&h<8?'background:#FFF8F8':'';
+
+    rows+=`<tr data-id="${r.id}" data-idx="${i}" style="${rowBg};border-top:0.5px solid var(--border)">
+      <td style="padding:8px 10px;text-align:center">
+        <input type="checkbox" class="ponto-chk" data-id="${r.id}" onchange="updatePontoBarra()" style="width:15px;height:15px;cursor:pointer" />
+      </td>
+      <td style="padding:8px 10px;font-weight:500">${nome}</td>
+      <td style="padding:8px 10px">${dataFmt}</td>
+      <td style="padding:8px 10px;text-align:center;${diasemColor}">${diaSem}</td>
+      <td style="padding:8px 10px;text-align:center">${r.entrada||'—'}</td>
+      <td style="padding:8px 10px;text-align:center;color:var(--text2);font-size:12px">${pausa}</td>
+      <td style="padding:8px 10px;text-align:center">${r.saida||'—'}</td>
+      <td style="padding:8px 10px;text-align:center">${totalBadge}</td>
+      <td style="padding:8px 10px">${tipoLabel}</td>
+      <td style="padding:8px 10px;text-align:center">
+        <button onclick="editarPontoIdx(${i})" style="background:none;border:none;cursor:pointer;color:#BA7517"><i class="ti ti-pencil" style="font-size:15px"></i></button>
+      </td>
+    </tr>`;
   });
-  el.innerHTML='<table><thead><tr><th>Colaborador</th><th>Data</th><th>Entrada</th><th>Início pausa</th><th>Fim pausa</th><th>Saída</th><th>Total</th><th>Ação</th></tr></thead><tbody>'+rows+'</tbody></table>';
+
+  el.innerHTML=`
+    <div id="pontoBarra" style="display:none;align-items:center;gap:10px;background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:10px;padding:10px 14px;margin-bottom:10px;flex-wrap:wrap">
+      <span style="font-size:13px;color:#185FA5;font-weight:500"><span id="pontoSelCount">0</span> selecionados</span>
+      <button onclick="selecionarTodosPontos()" style="font-size:12px;padding:4px 10px;border-radius:6px;border:0.5px solid #B5D4F4;background:#fff;color:#185FA5;cursor:pointer">Todos</button>
+      <button onclick="limparSelecaoPontos()" style="font-size:12px;padding:4px 10px;border-radius:6px;border:0.5px solid #B5D4F4;background:#fff;color:#185FA5;cursor:pointer">Limpar</button>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <button onclick="eliminarPontosSelecionados()" style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:#E24B4A;color:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-trash"></i> Eliminar</button>
+      </div>
+    </div>
+    <table><thead><tr>
+      <th style="width:36px;text-align:center"><input type="checkbox" id="chkAllPontos" onclick="toggleAllPontos()" style="width:15px;height:15px;cursor:pointer" /></th>
+      <th>Colaborador</th><th>Data</th><th>Dia</th><th>Entrada</th><th>Pausa</th><th>Saída</th><th>Total</th><th>Tipo</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
 }
+
+function updatePontoBarra(){
+  const sel=document.querySelectorAll('.ponto-chk:checked');
+  const barra=document.getElementById('pontoBarra');
+  const count=document.getElementById('pontoSelCount');
+  if(barra){barra.style.display=sel.length>0?'flex':'none';}
+  if(count)count.textContent=sel.length;
+  document.querySelectorAll('.ponto-chk').forEach(c=>{
+    const row=c.closest('tr');
+    if(row){
+      const bg=row.style.background;
+      if(c.checked) row.style.outline='2px solid #B5D4F4';
+      else row.style.outline='none';
+    }
+  });
+}
+
+function toggleAllPontos(){
+  const all=document.getElementById('chkAllPontos')?.checked;
+  document.querySelectorAll('.ponto-chk').forEach(c=>{c.checked=all;});
+  updatePontoBarra();
+}
+
+function selecionarTodosPontos(){
+  document.getElementById('chkAllPontos').checked=true;
+  toggleAllPontos();
+}
+
+function limparSelecaoPontos(){
+  document.getElementById('chkAllPontos').checked=false;
+  toggleAllPontos();
+}
+
+async function eliminarPontosSelecionados(){
+  const ids=Array.from(document.querySelectorAll('.ponto-chk:checked')).map(c=>c.dataset.id);
+  if(!ids.length)return;
+  if(!confirm('Eliminar '+ids.length+' registo(s) de ponto?'))return;
+  for(const id of ids){
+    await sb.from('ponto').delete().eq('id',id);
+  }
+  toast('✅ '+ids.length+' registo(s) eliminado(s)');
+  loadAPontos();
+}
+
 
 async function loadARForm(){
   const{data}=await sb.from('colaboradores').select('id,nome').order('nome');
