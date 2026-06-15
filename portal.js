@@ -336,7 +336,7 @@ function renderPontoTable(rows){
   }).join('');
 
   return stats+'<table><thead><tr><th>Data</th><th>Dia</th><th>Entrada</th><th>Pausa</th><th>Saída</th><th>Total</th><th>Tipo</th></tr></thead><tbody>'+tableRows+'</tbody></table>'+
-    '<div style="background:var(--blu);border-radius:8px;padding:10px;margin-top:8px;font-size:12px;color:var(--text2)">Normal = 8h/dia · Extra semana: 1ª hora 25%, demais 37,5% · Sábado = 50% · Domingo/Feriado = 100%</div>'';
+    '<div style="background:var(--blu);border-radius:8px;padding:10px;margin-top:8px;font-size:12px;color:var(--text2)">Normal = 8h/dia · Extra semana: 1ª hora 25%, demais 37,5% · Sábado = 50% · Domingo/Feriado = 100%</div>';
 }
 
 async function loadRecibos(){
